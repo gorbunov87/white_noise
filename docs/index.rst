@@ -1,226 +1,79 @@
 WhiteNoise
 ==========
 
-.. image:: https://img.shields.io/readthedocs/whitenoise?style=for-the-badge
-   :target: https://whitenoise.evans.io/en/latest/
-
-.. image:: https://img.shields.io/github/workflow/status/evansd/whitenoise/CI/master?style=for-the-badge
-   :target: https://github.com/evansd/whitenoise/actions?workflow=CI
-
-.. image:: https://img.shields.io/badge/Coverage-96%25-success?style=for-the-badge
-   :target: https://github.com/evansd/whitenoise/actions?workflow=CI
-
-.. image:: https://img.shields.io/pypi/v/whitenoise.svg?style=for-the-badge
-   :target: https://pypi.org/project/whitenoise/
-
-.. image:: https://img.shields.io/badge/code%20style-black-000000.svg?style=for-the-badge
-   :target: https://github.com/psf/black
-
-.. image:: https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white&style=for-the-badge
-   :target: https://github.com/pre-commit/pre-commit
-   :alt: pre-commit
-
-**Radically simplified static file serving for Python web apps**
-
-With a couple of lines of config WhiteNoise allows your web app to serve its
-own static files, making it a self-contained unit that can be deployed anywhere
-without relying on nginx, Amazon S3 or any other external service. (Especially
-useful on Heroku, OpenShift and other PaaS providers.)
-
-It's designed to work nicely with a CDN for high-traffic sites so you don't have to
-sacrifice performance to benefit from simplicity.
-
-WhiteNoise works with any WSGI-compatible app but has some special auto-configuration
-features for Django.
-
-WhiteNoise takes care of best-practices for you, for instance:
-
-* Serving compressed content (gzip and Brotli formats, handling Accept-Encoding
-  and Vary headers correctly)
-* Setting far-future cache headers on content which won't change
-
-Worried that serving static files with Python is horribly inefficient?
-Still think you should be using Amazon S3? Have a look at the `Infrequently
-Asked Questions`_ below.
-
-Installation
-------------
-
-Install with:
-
-.. code-block:: sh
-
-    pip install whitenoise
-
-QuickStart for Django apps
---------------------------
-
-Edit your ``settings.py`` file and add WhiteNoise to the ``MIDDLEWARE``
-list, above all other middleware apart from Django's `SecurityMiddleware
-<https://docs.djangoproject.com/en/stable/ref/middleware/#module-django.middleware.security>`_:
-
-.. code-block:: python
-
-   MIDDLEWARE = [
-       # ...
-       "django.middleware.security.SecurityMiddleware",
-       "whitenoise.middleware.WhiteNoiseMiddleware",
-       # ...
-   ]
-
-That's it, you're ready to go.
-
-Want forever-cacheable files and compression support? Just add this to your
-``settings.py``:
-
-.. code-block:: python
-
-   STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
-
-For more details, including on setting up
-CloudFront and other CDNs see the :doc:`Using WhiteNoise with Django <django>`
-guide.
+A Python library for serving static files directly from any WSGI application, with optional
+easy integration with Django. It is secure and efficient enough to use in production.
 
 
-QuickStart for other WSGI apps
-------------------------------
+Hasn't this been done already? What's new?
+------------------------------------------
 
-To enable WhiteNoise you need to wrap your existing WSGI application in a
-WhiteNoise instance and tell it where to find your static files. For example:
+Yes, there's Luke Arno's Static_ and Kenneth Reitz's dj-static_ which is built on top of it.
+However WhiteNoise offers a few benefits:
 
-.. code-block:: python
+ * Python 2/3 compatibility
+ * Serves pre-gzipped content (handling Accept-Encoding and Vary headers correctly)
+ * Customisable HTTP headers, in particular:
 
-   from whitenoise import WhiteNoise
+   - Cache headers (crucial if you're serving files to a CDN)
+   - Allow-Origin headers (crucial if you're serving font files to applications on a different domain)
 
-   from my_project import MyWSGIApp
+ * Can serve static files from arbitrary URLs, not just from a fixed URL prefix, so
+   you can use it to serve files like ``/favicon.ico`` or ``/robots.txt``
 
-   application = MyWSGIApp()
-   application = WhiteNoise(application, root="/path/to/static/files")
-   application.add_files("/path/to/more/static/files", prefix="more-files/")
-
-And that's it, you're ready to go. For more details see the :doc:`full
-documentation <base>`.
+.. _dj-static: https://github.com/kennethreitz/dj-static
+.. _Static: http://lukearno.com/projects/static/
 
 
-Using WhiteNoise with Flask
+Shouldn't I be using a real webserver?
+--------------------------------------
+
+Well, perhaps. Certainly something like nginx will be more efficient at serving static
+files. But here are a few things to consider:
+
+1. There are situations (e.g., when hosted on Heroku) where it's much simpler to have
+   everything handled by your Python application.
+
+2. WhiteNoise is pretty efficient itself. As it only has to serve a limited, fixed set of
+   files it does as much work as it can upfront on itialization so it can serve responses
+   with very little work. Also, when used with gunicorn (and most other WSGI servers) the
+   actual business of pushing the file down the network interface is handled by the OS's
+   highly efficient ``sendfile`` implementation, not by Python.
+
+3. If you're using WhiteNoise as the upstream to a CDN (on which more below) then it
+   doesn't really matter that it's not as efficient as nginx as the vast majority of
+   static requests will be cached by the CDN and never touch your application.
+
+
+Shouldn't I be using a CDN?
 ---------------------------
 
-WhiteNoise was not specifically written with Flask in mind, but as Flask uses
-the standard WSGI protocol it is easy to integrate with WhiteNoise (see the
-:doc:`Using WhiteNoise with Flask <flask>` guide).
+Yes, given how cheap and straightforward they are these days, you probably should.
+But you should be using WhiteNoise to act as the origin, or upstream, server to
+your CDN.
 
-
-Compatibility
--------------
-
-WhiteNoise works with any WSGI-compatible application and is tested on Python
-**3.7** – **3.10**, on both Linux and Windows.
-
-Django WhiteNoiseMiddlware is tested with Django versions **2.2** --- **4.0**
-
-
-Endorsements
-------------
-
-WhiteNoise owes its initial popularity to the nice things that some of Django
-and pip's core developers said about it:
-
-   `@jezdez <https://twitter.com/jezdez/status/440901769821179904>`_: *[WhiteNoise]
-   is really awesome and should be the standard for Django + Heroku*
-
-   `@dstufft <https://twitter.com/dstufft/status/440948000782032897>`_: *WhiteNoise
-   looks pretty excellent.*
-
-   `@idangazit <https://twitter.com/idangazit/status/456720556331528192>`_ *Received
-   a positive brainsmack from @_EvansD's WhiteNoise. Vastly smarter than S3 for
-   static assets. What was I thinking before?*
-
-It's now being used by thousands of projects, including some high-profile sites
-such as `mozilla.org <https://www.mozilla.org/>`_.
-
-
-Issues & Contributing
----------------------
-
-Raise an issue on the `GitHub project <https://github.com/evansd/whitenoise>`_ or
-feel free to nudge `@_EvansD <https://twitter.com/_evansd>`_ on Twitter.
-
-
-Infrequently Asked Questions
-----------------------------
-
-
-Isn't serving static files from Python horribly inefficient?
-++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-The short answer to this is that if you care about performance and efficiency
-then you should be using WhiteNoise behind a CDN like CloudFront. If you're
-doing *that* then, because of the caching headers WhiteNoise sends, the vast
-majority of static requests will be served directly by the CDN without touching
-your application, so it really doesn't make much difference how efficient
-WhiteNoise is.
-
-That said, WhiteNoise is pretty efficient. Because it only has to serve a fixed set of
-files it does all the work of finding files and determining the correct headers
-upfront on initialization. Requests can then be served with little more than a
-dictionary lookup to find the appropriate response. Also, when used with
-gunicorn (and most other WSGI servers) the actual business of pushing the file
-down the network interface is handled by the kernel's very efficient
-``sendfile`` syscall, not by Python.
+Under this model, the CDN acts as a caching proxy which sits between your application
+and the browser (only for static files, you still use your normal domain for dynamic
+requests). WhiteNoise will send the appropriate cache headers so the CDN can serve
+requests for static files without hitting your application.
 
 
 Shouldn't I be pushing my static files to S3 using something like Django-Storages?
-++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+-----------------------------------------------------------------------------------------------
 
-No, you shouldn't. The main problem with this approach is that Amazon S3 cannot
-currently selectively serve compressed content to your users. Compression
-(using either the venerable gzip or the more modern brotli algorithms) can make
-dramatic reductions in the bandwidth required for your CSS and JavaScript. But
-in order to do this correctly the server needs to examine the
-``Accept-Encoding`` header of the request to determine which compression
-formats are supported, and return an appropriate ``Vary`` header so that
-intermediate caches know to do the same. This is exactly what WhiteNoise does,
-but Amazon S3 currently provides no means of doing this.
+No, you shouldn't. The problem with this is that Amazon S3 cannot currently selectively serve
+gzipped content to your users. Gzipping can make dramatic reductions in the bandwidth required
+for your CSS and JavaScript. But while all browsers in use today can decode gzipped content, your
+users may be behind crappy corporate proxies or anti-virus scanners which don't handle gzipped
+content properly. Amazon S3 forces you to choose whether to serve gzipped content to no-one
+(wasting bandwidth) or everyone (running the risk of your site breaking for certain users).
 
-The second problem with a push-based approach to handling static files is that
-it adds complexity and fragility to your deployment process: extra libraries
-specific to your storage backend, extra configuration and authentication keys,
-and extra tasks that must be run at specific points in the deployment in order
-for everything to work.  With the CDN-as-caching-proxy approach that WhiteNoise
-takes there are just two bits of configuration: your application needs the URL
-of the CDN, and the CDN needs the URL of your application. Everything else is
-just standard HTTP semantics. This makes your deployments simpler, your life
-easier, and you happier.
+The correct behaviour is to examine the ``Accept-Encoding`` header of the request to see if gzip
+is supported, and to return an appropriate ``Vary`` header so that intermediate caches know to do
+the same thing. This is exactly what WhiteNoise does.
 
-
-What's the point in WhiteNoise when I can do the same thing in a few lines of Apache/nginx config?
-++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-There are two answers here. One is that WhiteNoise is designed to work in
-situations where Apache, nginx and the like aren't easily available. But more
-importantly, it's easy to underestimate what's involved in serving static files
-correctly. Does your few lines of nginx config distinguish between files which
-might change and files which will never change and set the cache headers
-appropriately? Did you add the right CORS headers so that your fonts load
-correctly when served via a CDN?  Did you turn on the special nginx setting
-which allows it to send gzipped content in response to an ``HTTP/1.0`` request,
-which for some reason CloudFront still uses? Did you install the extension which
-allows you to serve pre-compressed brotli-encoded content to modern browsers?
-
-None of this is rocket science, but it's fiddly and annoying and WhiteNoise
-takes care of all it for you.
-
-
-License
--------
-
-MIT Licensed
+Contents
+--------
 
 .. toctree::
-   :hidden:
-
-   self
-   django
-   base
-   flask
-   changelog
+   :maxdepth: 2
