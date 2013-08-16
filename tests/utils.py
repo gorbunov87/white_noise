@@ -1,71 +1,44 @@
-from __future__ import annotations
+from __future__ import absolute_import, unicode_literals
 
-import os
+import gzip
+import io
 import threading
 import warnings
-from typing import Any
-from wsgiref.simple_server import WSGIRequestHandler, make_server
-from wsgiref.util import shift_path_info
+from wsgiref.simple_server import make_server, WSGIRequestHandler
 
 import requests
 
-warnings.filterwarnings(action="ignore", category=DeprecationWarning, module="requests")
-
-
-TEST_FILE_PATH = os.path.join(os.path.dirname(__file__), "test_files")
+warnings.filterwarnings(action='ignore', category=DeprecationWarning,
+        module='requests')
 
 
 class SilentWSGIHandler(WSGIRequestHandler):
     def log_message(*args):
         pass
 
-
-class AppServer:
+class TestServer(object):
     """
     Wraps a WSGI application and allows you to make real HTTP
     requests against it
     """
 
-    PREFIX = "subdir"
-
     def __init__(self, application):
         self.application = application
-        self.server = make_server(
-            "127.0.0.1", 0, self.serve_under_prefix, handler_class=SilentWSGIHandler
-        )
+        self.server = make_server('127.0.0.1', 0, application,
+                handler_class=SilentWSGIHandler)
 
-    def serve_under_prefix(self, environ, start_response):
-        prefix = shift_path_info(environ)
-        if prefix != self.PREFIX:
-            start_response("404 Not Found", [])
-            return []
-        else:
-            return self.application(environ, start_response)
-
-    def get(self, *args: Any, **kwargs: Any) -> requests.Response:
-        return self.request("get", *args, **kwargs)
-
-    def request(
-        self, method: str, path: str, *args: Any, **kwargs: Any
-    ) -> requests.Response:
-        url = "http://{0[0]}:{0[1]}{1}".format(self.server.server_address, path)
+    def get(self, path, *args, **kwargs):
+        url = 'http://{0[0]}:{0[1]}{1}'.format(self.server.server_address, path)
         thread = threading.Thread(target=self.server.handle_request)
         thread.start()
-        response = requests.request(method, url, *args, **kwargs)
+        response = requests.get(url, *args, **kwargs)
         thread.join()
         return response
 
-    def close(self) -> None:
-        self.server.server_close()
 
-
-class Files:
-    def __init__(self, directory: str, **files: str) -> None:
-        self.directory = os.path.join(TEST_FILE_PATH, directory)
-        for name, path in files.items():
-            url = f"/{AppServer.PREFIX}/{path}"
-            with open(os.path.join(self.directory, path), "rb") as f:
-                content = f.read()
-            setattr(self, name + "_path", path)
-            setattr(self, name + "_url", url)
-            setattr(self, name + "_content", content)
+def gzip_bytes(b):
+    f = io.BytesIO()
+    gz = gzip.GzipFile(fileobj=f, mode='wb')
+    gz.write(b)
+    gz.close()
+    return f.getvalue()
