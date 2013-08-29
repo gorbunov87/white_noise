@@ -1,38 +1,34 @@
-from __future__ import annotations
+SECRET_KEY = '4'
+STATIC_URL = '/static/'
 
-import os.path
+ROOT_URLCONF = 'tests.django_urls'
 
-from .utils import TEST_FILE_PATH, AppServer
+INSTALLED_APPS = (
+    'django.contrib.staticfiles',
+    'whitenoise',
+)
 
-ALLOWED_HOSTS = ["*"]
-
-ROOT_URLCONF = "tests.django_urls"
-
-SECRET_KEY = "test_secret"
-
-INSTALLED_APPS = ["whitenoise.runserver_nostatic", "django.contrib.staticfiles"]
-
-FORCE_SCRIPT_NAME = "/" + AppServer.PREFIX
-STATIC_URL = FORCE_SCRIPT_NAME + "/static/"
-
-STATIC_ROOT = os.path.join(TEST_FILE_PATH, "root")
-
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
-
-MIDDLEWARE = ["whitenoise.middleware.WhiteNoiseMiddleware"]
+ALLOWED_HOSTS = ['*']
 
 LOGGING = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "filters": {"require_debug_false": {"()": "django.utils.log.RequireDebugFalse"}},
-    "handlers": {"log_to_stderr": {"level": "ERROR", "class": "logging.StreamHandler"}},
-    "loggers": {
-        "django.request": {
-            "handlers": ["log_to_stderr"],
-            "level": "ERROR",
-            "propagate": True,
+    'version': 1,
+    'disable_existing_loggers': False,
+    'filters': {
+        'require_debug_false': {
+            '()': 'django.utils.log.RequireDebugFalse'
         }
     },
+    'handlers': {
+        'log_to_stderr': {
+            'level': 'ERROR',
+            'class': 'logging.StreamHandler'
+        }
+    },
+    'loggers': {
+        'django.request': {
+            'handlers': ['log_to_stderr'],
+            'level': 'ERROR',
+            'propagate': True,
+        },
+    }
 }
-
-USE_TZ = True

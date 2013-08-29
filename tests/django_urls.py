@@ -1,5 +1,9 @@
-from __future__ import annotations
+from django.conf.urls import patterns, url
+from django.http import HttpResponse
 
-from django.urls import URLPattern
+def hello_world(reqeust):
+    return HttpResponse(content='Hello Word', content_type='text/plain')
 
-urlpatterns: list[URLPattern] = []
+urlpatterns = patterns('',
+    url(r'^hello$', hello_world),
+)
