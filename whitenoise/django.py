@@ -1,8 +1,14 @@
 from __future__ import absolute_import
 
+import os.path
 import os
 import re
 import textwrap
+
+try:
+    import urlparse
+except ImportError:
+    import urllib.parse as urlparse
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
@@ -16,15 +22,18 @@ except ImproperlyConfigured:
     else:
         raise
 from django.contrib.staticfiles import finders
-from django.contrib.staticfiles.storage import ManifestStaticFilesStorage
-from django.utils.six.moves.urllib.parse import urlparse
+try:
+    from django.contrib.staticfiles.storage import ManifestStaticFilesStorage
+except ImportError:
+    # For Django versions < 1.7
+    from .storage_backport import ManifestStaticFilesStorage
 
 from .base import WhiteNoise, format_prefix
 from .gzip import compress, extension_regex, GZIP_EXCLUDE_EXTENSIONS
 
 
 def get_prefix_from_url(url):
-    return format_prefix(urlparse(url).path)
+    return format_prefix(urlparse.urlparse(url).path)
 
 
 class DjangoWhiteNoise(WhiteNoise):
@@ -37,7 +46,8 @@ class DjangoWhiteNoise(WhiteNoise):
         self.configure_from_settings(settings)
         self.check_settings(settings)
         super(DjangoWhiteNoise, self).__init__(application)
-        self.add_files(self.static_root, prefix=self.static_prefix)
+        if self.static_root:
+            self.add_files(self.static_root, prefix=self.static_prefix)
         if self.root:
             self.add_files(self.root)
 
@@ -60,9 +70,6 @@ class DjangoWhiteNoise(WhiteNoise):
         self.static_root = getattr(settings, 'STATIC_ROOT', None)
 
     def check_settings(self, settings):
-        if not self.static_root:
-            raise ImproperlyConfigured('STATIC_ROOT '
-                    'setting must be set to a filesystem path')
         if self.static_prefix == '/':
             static_url = getattr(settings, 'STATIC_URL', '').rstrip('/')
             raise ImproperlyConfigured('STATIC_URL setting must include a '
