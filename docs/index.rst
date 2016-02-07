@@ -1,9 +1,19 @@
 WhiteNoise
 ==========
 
-**Radically simplified static file serving for Python web apps**
+.. image:: https://img.shields.io/travis/evansd/whitenoise.svg
+   :target:  https://travis-ci.org/evansd/whitenoise
+   :alt: Build Status
 
-.. warning:: This documentation refers to an older, unsupported version of WhiteNoise.
+.. image:: https://img.shields.io/pypi/v/whitenoise.svg
+    :target: https://pypi.python.org/pypi/whitenoise
+    :alt: Latest PyPI version
+
+.. image:: https://img.shields.io/pypi/dm/whitenoise.svg
+    :target: https://pypi.python.org/pypi/whitenoise
+    :alt: Latest PyPI version
+
+**Radically simplified static file serving for Python web apps**
 
 With a couple of lines of config WhiteNoise allows your web app to serve its
 own static files, making it a self-contained unit that can be deployed anywhere
