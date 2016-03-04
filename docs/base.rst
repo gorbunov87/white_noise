@@ -80,7 +80,7 @@ files for you. Usage is simple:
       -q, --quiet  Don't produce log output (default: False)
 
 You can either run this during development and commit your compressed files to
-your repository, or you can run this as part of your build and deploy processs.
+your repository, or you can run this as part of your build and deploy processes.
 (Note that DjangoWhiteNoise handles this automatically, if you're using the
 custom storage backend.)
 
@@ -111,12 +111,39 @@ Once you have implemented this, any files which are flagged as immutable will ha
 forever' headers set.
 
 
+Customising Headers
+-------------------
+
+For more advanced header control, sub-class WhiteNoise and override the
+``add_extra_headers()`` method. For example, the Content-Type can be
+overridden like so:
+
+.. code-block:: python
+
+   class CustomWhiteNoise(WhiteNoise):
+
+       def add_extra_headers(self, headers, path, url):
+           if url == '/apple-app-site-association':
+               headers['Content-Type'] = 'application/pkcs7-mime'
+
+
 Using a Content Distribution Network
 ------------------------------------
 
 See the instructions for :ref:`using a CDN with Django <cdn>` . The same principles
 apply here although obviously the exact method for generating the URLs for your static
 files will depend on the libraries you're using.
+
+
+Redirecting to HTTPS
+--------------------
+
+WhiteNoise does not handle redirection itself, but works well alongside
+`wsgi-sslify`_, which performs HTTP to HTTPS redirection as well as optionally
+setting an HSTS header. Simply wrap the WhiteNoise WSGI application with
+``sslify()`` - see the `wsgi-sslify`_ documentation for more details.
+
+.. _wsgi-sslify: https://github.com/jacobian/wsgi-sslify
 
 
 .. _configuration:
@@ -147,6 +174,27 @@ sub-classing WhiteNoise and setting the attributes directly.
     long enough that, if you're running WhiteNoise behind a CDN, the CDN will still take
     the majority of the strain during times of heavy load.
 
+.. attribute:: mimetypes
+
+    :default: ``None``
+
+    A dictionary mapping file extensions (lowercase) to the mimetype for that
+    extension. For example: ::
+
+        {'.foo': 'application/x-foo'}
+
+    Note that WhiteNoise ships with its own default set of mimetypes and does
+    not use the system-supplied ones (e.g. ``/etc/mime.types``). This ensures
+    that it behaves consistently regardless of the environment in which it's
+    run.  View the defaults in the :file:`media_types.py
+    <whitenoise/media_types.py>` file.
+
+    In addition to file extensions, mimetypes can be specifed by supplying the entire
+    filename, for example: ::
+
+        {'some-special-file': 'application/x-custom-type'}
+
+
 .. attribute:: charset
 
     :default: ``utf-8``
@@ -167,7 +215,7 @@ sub-classing WhiteNoise and setting the attributes directly.
     may have problems with fonts loading in Firefox, or accessing images in canvas
     elements, or other mysterious things.
 
-    The W3C `explicity state`__ that this behaviour is safe for publicly
+    The W3C `explicitly state`__ that this behaviour is safe for publicly
     accessible files.
 
 .. __: http://www.w3.org/TR/cors/#security

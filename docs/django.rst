@@ -15,7 +15,7 @@ instructions below should apply whatever your hosting platform.
 ----------------------------------------------------
 
 If you're familiar with Django you'll know what to do. If you're just getting started
-with a new Django project (v1.6 and up) then you'll need add the following to the bottom of your
+with a new Django project then you'll need add the following to the bottom of your
 ``settings.py`` file:
 
 .. code-block:: python
@@ -26,29 +26,43 @@ As part of deploying your application you'll need to run ``./manage.py collectst
 put all your static files into ``STATIC_ROOT``. (If you're running on Heroku then
 this is done automatically for you.)
 
-In your templates, make sure you're using the static_ template tag to refer
-to your static files. For example:
+In Django 1.9 and older, make sure you're using the static_ template tag to
+refer to your static files. For example:
 
 .. code-block:: html
 
    {% load static from staticfiles %}
    <img src="{% static "images/hi.jpg" %}" alt="Hi!" />
 
-.. _static: https://docs.djangoproject.com/en/1.7/ref/contrib/staticfiles/#std:templatetag-staticfiles-static
+In Django 1.10 and later, you can use ``{% load static %}`` instead.
+
+.. _static: https://docs.djangoproject.com/en/1.9/ref/contrib/staticfiles/#std:templatetag-staticfiles-static
+
+.. note:: For performance and security reasons WhiteNoise does not check for new
+   files after startup (unless using Django `DEBUG` mode). As such, all static
+   files must be generated in advance. If you're using Django Compressor, this
+   can be performed using its `pre-compression`_ feature.
+
+   For the same reason, Django media files cannot be served by WhiteNoise, since
+   user-uploaded files won't exist at app startup.
+
+.. _pre-compression: https://django-compressor.readthedocs.org/en/latest/usage/#pre-compression
 
 
 2. Enable WhiteNoise
 --------------------
 
-Edit your ``wsgi.py`` file and wrap your WSGI application like so:
+Edit your ``settings.py`` file and add WhiteNoise to the ``MIDDLEWARE_CLASSES``
+list, above all other middleware apart from Django's `SecurityMiddleware
+<https://docs.djangoproject.com/en/stable/ref/middleware/#module-django.middleware.security>`_:
 
 .. code-block:: python
 
-   from django.core.wsgi import get_wsgi_application
-   from whitenoise.django import DjangoWhiteNoise
-
-   application = get_wsgi_application()
-   application = DjangoWhiteNoise(application)
+   MIDDLEWARE_CLASSES = [
+     # 'django.middleware.security.SecurityMiddleware',
+     'whitenoise.middleware.WhiteNoiseMiddleware',
+     # ...
+   ]
 
 That's it -- WhiteNoise will now serve your static files. However, to get the
 best performance you should proceed to step 3 below and enable gzipping and
@@ -64,10 +78,7 @@ forever. To use it, just add this to your ``settings.py``:
 
 .. code-block:: python
 
-   STATICFILES_STORAGE = 'whitenoise.django.GzipManifestStaticFilesStorage'
-
-This uses the new ManifestStaticFilesStorage in Django 1.7, with a backport
-provided automatically for older versions of Django.
+   STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 
 Troubleshooting
@@ -79,23 +90,17 @@ thin wrapper around Django's storage to add gzip support, and because the gzip c
 very simple it generally doesn't cause problems.
 
 To test whether the problems are due to WhiteNoise or not, try swapping the WhiteNoise
-storage backend for the Django one. If you're running Django 1.7 or above, try:
+storage backend for the Django one:
 
 .. code-block:: python
 
    STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.ManifestStaticFilesStorage'
 
-Or if you're running Django 1.6 or below, try:
-
-.. code-block:: python
-
-   STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.CachedStaticFilesStorage'
-
 If the problems persist then your issue is with Django itself (try the docs_ or
 the `mailing list`_). If the problem only occurs with WhiteNoise then raise a
 ticket on the `issue tracker`_.
 
-.. _docs: https://docs.djangoproject.com/en/dev/ref/contrib/staticfiles/
+.. _docs: https://docs.djangoproject.com/en/stable/ref/contrib/staticfiles/
 .. _mailing list: https://groups.google.com/d/forum/django-users
 .. _issue tracker: https://github.com/evansd/whitenoise/issues
 
@@ -129,7 +134,7 @@ looks something like this:
 
 .. code-block:: python
 
-   STATIC_HOST = '//d4663kmspf1sqa.cloudfront.net' if not DEBUG else ''
+   STATIC_HOST = 'https://d4663kmspf1sqa.cloudfront.net' if not DEBUG else ''
    STATIC_URL = STATIC_HOST + '/static/'
 
 Or, even better, you can avoid hardcoding your CDN into your settings by doing something like this:
@@ -222,6 +227,26 @@ arguments uppercased with a 'WHITENOISE\_' prefix.
     long enough that, if you're running WhiteNoise behind a CDN, the CDN will still take
     the majority of the strain during times of heavy load.
 
+.. attribute:: WHITENOISE_MIMETYPES
+
+    :default: ``None``
+
+    A dictionary mapping file extensions (lowercase) to the mimetype for that
+    extension. For example: ::
+
+        {'.foo': 'application/x-foo'}
+
+    Note that WhiteNoise ships with its own default set of mimetypes and does
+    not use the system-supplied ones (e.g. ``/etc/mime.types``). This ensures
+    that it behaves consistently regardless of the environment in which it's
+    run.  View the defaults in the :file:`media_types.py
+    <whitenoise/media_types.py>` file.
+
+    In addition to file extensions, mimetypes can be specifed by supplying the entire
+    filename, for example: ::
+
+        {'some-special-file': 'application/x-custom-type'}
+
 
 .. attribute:: WHITENOISE_CHARSET
 
@@ -244,13 +269,13 @@ arguments uppercased with a 'WHITENOISE\_' prefix.
     may have problems with fonts loading in Firefox, or accessing images in canvas
     elements, or other mysterious things.
 
-    The W3C `explicity state`__ that this behaviour is safe for publicly
+    The W3C `explicitly state`__ that this behaviour is safe for publicly
     accessible files.
 
 .. __: http://www.w3.org/TR/cors/#security
 
 
-.. attribute:: WHITENOISE_GZIP_EXCLUDE_EXTENSIONS
+.. attribute:: WHITENOISE_SKIP_COMPRESS_EXTENSIONS
 
     :default: ``('jpg', 'jpeg', 'png', 'gif', 'webp','zip', 'gz', 'tgz', 'bz2', 'tbz', 'swf', 'flv', 'woff')``
 
@@ -261,5 +286,3 @@ arguments uppercased with a 'WHITENOISE\_' prefix.
     and attempt to gzip all files. However, for files which we're confident
     won't benefit from compression, it speeds up the process if we just skip
     over them.
-
-

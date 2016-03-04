@@ -1,21 +1,9 @@
 from __future__ import absolute_import, print_function, division, unicode_literals
 
 import argparse
-import contextlib
 import gzip
 import os
-import os.path
 import re
-import sys
-
-
-if sys.version_info[:2] > (2, 6):
-    GzipFile = gzip.GzipFile
-else:
-    def GzipFile(*args, **kwargs):
-        # Remove unsupported argument
-        kwargs.pop('mtime', None)
-        return contextlib.closing(gzip.GzipFile(*args, **kwargs))
 
 
 # Makes the default extension list look a bit nicer
@@ -38,7 +26,9 @@ GZIP_EXCLUDE_EXTENSIONS = PrettyTuple((
     'woff', 'woff2'
 ))
 
-null_log = lambda x: x
+
+def null_log(s):
+    pass
 
 
 def main(root, extensions=None, quiet=False, log=print):
@@ -66,7 +56,7 @@ def compress(path, log=null_log):
     with open(path, 'rb') as in_file:
         # Explicitly set mtime to 0 so gzip content is fully determined
         # by file content (0 = "no timestamp" according to gzip spec)
-        with GzipFile(gzip_path, 'wb', compresslevel=9, mtime=0) as out_file:
+        with gzip.GzipFile(gzip_path, 'wb', compresslevel=9, mtime=0) as out_file:
             for chunk in iter(lambda: in_file.read(CHUNK_SIZE), b''):
                 out_file.write(chunk)
     # If gzipped file isn't actually any smaller then get rid of it
@@ -95,7 +85,9 @@ if __name__ == '__main__':
             formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('-q', '--quiet', help="Don't produce log output", action='store_true')
     parser.add_argument('root', help='Path root from which to search for files')
-    parser.add_argument('extensions', nargs='*', help='File extensions to exclude from gzipping',
-            default=GZIP_EXCLUDE_EXTENSIONS)
+    parser.add_argument('extensions',
+                        nargs='*',
+                        help='File extensions to exclude from gzipping',
+                        default=GZIP_EXCLUDE_EXTENSIONS)
     args = parser.parse_args()
     main(**vars(args))
