@@ -1,12 +1,6 @@
-from __future__ import absolute_import
-
 import os
-import sys
 import tempfile
-if sys.version_info[:2] <= (2, 6):
-    from unittest2 import TestCase
-else:
-    from unittest import TestCase
+from unittest import TestCase
 import shutil
 from wsgiref.simple_server import demo_app
 
@@ -23,29 +17,32 @@ if not hasattr(TestCase, 'assertRegex'):
     TestCase = Py3TestCase
 
 
-class CustomWhiteNoise(WhiteNoise):
-
-    EXTRA_MIMETYPES = WhiteNoise.EXTRA_MIMETYPES + (
-            ('application/x-foo-bar', '.foobar'),)
-
-
 class WhiteNoiseTest(TestCase):
 
     @classmethod
     def setUpClass(cls):
         cls.files = cls.init_files()
-        cls.application = CustomWhiteNoise(demo_app,
-                root=cls.files.directory, max_age=1000)
+        cls.application = cls.init_application(root=cls.files.directory)
         cls.server = TestServer(cls.application)
         super(WhiteNoiseTest, cls).setUpClass()
 
     @staticmethod
     def init_files():
         return Files('assets',
-            js='subdir/javascript.js',
-            gzip='compressed.css',
-            gzipped='compressed.css.gz',
-            custom_mime='custom-mime.foobar')
+                     js='subdir/javascript.js',
+                     gzip='compressed.css',
+                     gzipped='compressed.css.gz',
+                     custom_mime='custom-mime.foobar')
+
+    @staticmethod
+    def init_application(**kwargs):
+        def custom_headers(headers, path, url):
+            if url.endswith('.css'):
+                headers['X-Is-Css-File'] = 'True'
+        kwargs.update(max_age=1000,
+                      mimetypes={'.foobar': 'application/x-foo-bar'},
+                      add_headers_function=custom_headers)
+        return WhiteNoise(demo_app, **kwargs)
 
     def test_get_file(self):
         response = self.server.get(self.files.js_url)
@@ -118,9 +115,13 @@ class WhiteNoiseTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.content)
 
-    def test_custom_mimetpye(self):
+    def test_custom_mimetype(self):
         response = self.server.get(self.files.custom_mime_url)
         self.assertRegex(response.headers['Content-Type'], r'application/x-foo-bar\b')
+
+    def test_custom_headers(self):
+        response = self.server.get(self.files.gzip_url)
+        self.assertEqual(response.headers['x-is-css-file'], 'True')
 
 
 class WhiteNoiseAutorefresh(WhiteNoiseTest):
@@ -129,9 +130,7 @@ class WhiteNoiseAutorefresh(WhiteNoiseTest):
     def setUpClass(cls):
         cls.files = cls.init_files()
         cls.tmp = tempfile.mkdtemp()
-        # Initialize test application
-        cls.application = CustomWhiteNoise(demo_app,
-                root=cls.tmp, max_age=1000, autorefresh=True)
+        cls.application = cls.init_application(root=cls.tmp, autorefresh=True)
         cls.server = TestServer(cls.application)
         # Copy in the files *after* initializing server
         copytree(cls.files.directory, cls.tmp)

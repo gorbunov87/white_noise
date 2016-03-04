@@ -1,4 +1,4 @@
-from __future__ import absolute_import, unicode_literals
+from __future__ import unicode_literals
 
 import shutil
 import tempfile
@@ -8,23 +8,15 @@ from django.test import SimpleTestCase
 from django.test.utils import override_settings
 from django.conf import settings
 from django.contrib.staticfiles import storage, finders
-try:
-    from django.contrib.staticfiles.storage import HashedFilesMixin
-except ImportError:
-    from django.contrib.staticfiles.storage import (
-            CachedFilesMixin as HashedFilesMixin)
 from django.core.wsgi import get_wsgi_application
 from django.core.management import call_command
 from django.utils.functional import empty
 
 from .utils import TestServer, Files
 
-from whitenoise.django import (DjangoWhiteNoise, HelpfulExceptionMixin,
-        MissingFileError)
+from whitenoise.django import DjangoWhiteNoise
 
-# For Django 1.7+ ensure app registry is ready
-if hasattr(django, 'setup'):
-    django.setup()
+django.setup()
 
 
 def reset_lazy_object(obj):
@@ -39,17 +31,21 @@ class DjangoWhiteNoiseTest(SimpleTestCase):
         cls.static_files = Files('static', css='styles.css')
         cls.root_files = Files('root', robots='robots.txt')
         cls.tmp = tempfile.mkdtemp()
-        settings.STATICFILES_STORAGE = 'whitenoise.django.GzipManifestStaticFilesStorage'
+        settings.STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
         settings.STATICFILES_DIRS = [cls.static_files.directory]
         settings.STATIC_ROOT = cls.tmp
         settings.WHITENOISE_ROOT = cls.root_files.directory
         # Collect static files into STATIC_ROOT
         call_command('collectstatic', verbosity=0, interactive=False)
         # Initialize test application
-        django_app = get_wsgi_application()
-        cls.application = DjangoWhiteNoise(django_app)
+        cls.application = cls.init_application()
         cls.server = TestServer(cls.application)
         super(DjangoWhiteNoiseTest, cls).setUpClass()
+
+    @classmethod
+    def init_application(cls):
+        django_app = get_wsgi_application()
+        return DjangoWhiteNoise(django_app)
 
     @classmethod
     def tearDownClass(cls):
@@ -67,14 +63,14 @@ class DjangoWhiteNoiseTest(SimpleTestCase):
         response = self.server.get(url)
         self.assertEqual(response.content, self.static_files.css_content)
         self.assertEqual(response.headers.get('Cache-Control'),
-                'public, max-age={}'.format(DjangoWhiteNoise.FOREVER))
+                         'public, max-age={}'.format(DjangoWhiteNoise.FOREVER))
 
     def test_unversioned_file_not_cached_forever(self):
         url = settings.STATIC_URL + self.static_files.css_path
         response = self.server.get(url)
         self.assertEqual(response.content, self.static_files.css_content)
         self.assertEqual(response.headers.get('Cache-Control'),
-                'public, max-age={}'.format(DjangoWhiteNoise.max_age))
+                         'public, max-age={}'.format(DjangoWhiteNoise.max_age))
 
     def test_get_gzip(self):
         url = storage.staticfiles_storage.url(self.static_files.css_path)
@@ -99,10 +95,14 @@ class UseFindersTest(SimpleTestCase):
         except AttributeError:
             finders._finders.clear()
         # Initialize test application
-        django_app = get_wsgi_application()
-        cls.application = DjangoWhiteNoise(django_app)
+        cls.application = cls.init_application()
         cls.server = TestServer(cls.application)
         super(UseFindersTest, cls).setUpClass()
+
+    @classmethod
+    def init_application(cls):
+        django_app = get_wsgi_application()
+        return DjangoWhiteNoise(django_app)
 
     def test_get_file_from_static_dir(self):
         url = settings.STATIC_URL + self.static_files.css_path
@@ -110,18 +110,11 @@ class UseFindersTest(SimpleTestCase):
         self.assertEqual(response.content, self.static_files.css_content)
 
 
-@override_settings()
-class DjangoWhiteNoiseStorageTest(SimpleTestCase):
+class DjangoMiddlewareTest(DjangoWhiteNoiseTest):
 
-    def test_make_helpful_exception(self):
-        class TriggerException(HashedFilesMixin):
-            def exists(self, path):
-                return False
-        exception = None
-        try:
-            TriggerException().hashed_name('/missing/file.png')
-        except ValueError as e:
-            exception = e
-        helpful_exception = HelpfulExceptionMixin() \
-                .make_helpful_exception(exception, 'styles/app.css')
-        self.assertIsInstance(helpful_exception, MissingFileError)
+    @classmethod
+    def init_application(cls):
+        middleware = list(settings.MIDDLEWARE_CLASSES)
+        middleware.insert(0, 'whitenoise.middleware.WhiteNoiseMiddleware')
+        settings.MIDDLEWARE_CLASSES = middleware
+        return get_wsgi_application()

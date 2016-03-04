@@ -1,10 +1,19 @@
 WhiteNoise
 ==========
 
-**Radically simplified static file serving for Python web apps**
+.. image:: https://img.shields.io/travis/evansd/whitenoise.svg
+   :target:  https://travis-ci.org/evansd/whitenoise
+   :alt: Build Status
 
-.. warning:: This documentation refers to version |version| of WhiteNoise,
-             which is no longer officially supported.
+.. image:: https://img.shields.io/pypi/v/whitenoise.svg
+    :target: https://pypi.python.org/pypi/whitenoise
+    :alt: Latest PyPI version
+
+.. image:: https://img.shields.io/pypi/dm/whitenoise.svg
+    :target: https://pypi.python.org/pypi/whitenoise
+    :alt: Latest PyPI version
+
+**Radically simplified static file serving for Python web apps**
 
 With a couple of lines of config WhiteNoise allows your web app to serve its
 own static files, making it a self-contained unit that can be deployed anywhere
@@ -30,23 +39,25 @@ Asked Questions`_ below.
 QuickStart for Django apps
 --------------------------
 
-Edit your ``wsgi.py`` file and wrap your WSGI application like so:
+Edit your ``settings.py`` file and add WhiteNoise to the ``MIDDLEWARE_CLASSES``
+list, above all other middleware apart from Django's `SecurityMiddleware
+<https://docs.djangoproject.com/en/stable/ref/middleware/#module-django.middleware.security>`_:
 
 .. code-block:: python
 
-   from django.core.wsgi import get_wsgi_application
-   from whitenoise.django import DjangoWhiteNoise
-
-   application = get_wsgi_application()
-   application = DjangoWhiteNoise(application)
+   MIDDLEWARE_CLASSES = [
+     # 'django.middleware.security.SecurityMiddleware',
+     'whitenoise.middleware.WhiteNoiseMiddleware',
+     # ...
+   ]
 
 That's it, you're ready to go.
 
-Want forever-cachable files and gzip support? Just add this to your ``settings.py``:
+Want forever-cacheable files and gzip support? Just add this to your ``settings.py``:
 
 .. code-block:: python
 
-   STATICFILES_STORAGE = 'whitenoise.django.GzipManifestStaticFilesStorage'
+   STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 For more details, including on setting up
 CloudFront and other CDNs see the :doc:`Using WhiteNoise with Django <django>`
@@ -76,9 +87,9 @@ documentation <base>`.
 Compatibility
 -------------
 
-WhiteNoise works with any WSGI-compatible application and is tested on Python **2.6**, **2.7**, **3.3**, **3.4**, **3.5** and **PyPy**.
+WhiteNoise works with any WSGI-compatible application and is tested on Python **2.7**, **3.3**, **3.4**, **3.5** and **PyPy**.
 
-DjangoWhiteNoise is tested with Django versions **1.4** --- **1.9**
+DjangoWhiteNoise is tested with Django versions **1.8** --- **1.9**
 
 
 Endorsements
@@ -122,7 +133,7 @@ your application, so it really doesn't make much difference how efficient
 WhiteNoise is.
 
 That said, WhiteNoise is pretty efficient. Because it only has to serve a fixed set of
-files it does all the work of finding files and determing the correct headers
+files it does all the work of finding files and determining the correct headers
 upfront on initialization. Requests can then be served with little more than a
 dictionary lookup to find the appropriate response. Also, when used with
 gunicorn (and most other WSGI servers) the actual business of pushing the file
@@ -151,7 +162,7 @@ The second problem with a push-based approach to handling static files is that
 it adds complexity and fragility to your deployment process: extra libraries
 specific to your storage backend, extra configuration and authentication keys,
 and extra tasks that must be run at specific points in the deployment in order
-for everythig to work.  With the CDN-as-caching-proxy approach that WhiteNoise
+for everything to work.  With the CDN-as-caching-proxy approach that WhiteNoise
 takes there are just two bits of configuration: your application needs the URL
 of the CDN, and the CDN needs the URL of your application. Everything else is
 just standard HTTP semantics. This makes your deployments simpler, your life

@@ -1,16 +1,12 @@
-from __future__ import absolute_import, unicode_literals
+from __future__ import unicode_literals
 
 import contextlib
 import errno
 import gzip
 import os
 import shutil
-import sys
 import tempfile
-if sys.version_info[:2] <= (2, 6):
-    from unittest2 import TestCase
-else:
-    from unittest import TestCase
+from unittest import TestCase
 
 from whitenoise.gzip import main as gzip_main
 
@@ -22,6 +18,7 @@ TEST_FILES = {
     COMPRESSABLE_FILE: b'a' * 1000,
     TOO_SMALL_FILE: b'hi',
 }
+
 
 class GzipTestBase(TestCase):
 
@@ -46,6 +43,7 @@ class GzipTestBase(TestCase):
         super(GzipTestBase, cls).tearDownClass()
         # Remove temporary directory
         shutil.rmtree(cls.tmp)
+
 
 class GzipTest(GzipTestBase):
 
