@@ -1,20 +1,30 @@
+from __future__ import absolute_import
+
 from email.utils import parsedate, formatdate
 import errno
+from mimetypes import MimeTypes
 import os
+import os.path
 from posixpath import normpath
 import re
 import stat
 from wsgiref.headers import Headers
 
-from .media_types import MediaTypes
+
+class NotARegularFileError(Exception): pass
+class MissingFileError(NotARegularFileError): pass
 
 
-class NotARegularFileError(Exception):
-    pass
+def configure_mimetypes(extra_types):
+    """
+    Add additional mimetypes to a local MimeTypes instance to avoid polluting
+    global registery
+    """
+    mimetypes = MimeTypes()
+    for content_type, extension in extra_types:
+        mimetypes.add_type(content_type, extension)
+    return mimetypes
 
-
-class MissingFileError(NotARegularFileError):
-    pass
 
 
 def stat_regular_file(path):
@@ -31,7 +41,7 @@ def stat_regular_file(path):
     if not stat.S_ISREG(file_stat.st_mode):
         # We ignore directories and treat them as missing files
         if stat.S_ISDIR(file_stat.st_mode):
-            raise MissingFileError('Path is a directory: {0}'.format(path))
+            raise MissingFileError()
         else:
             raise NotARegularFileError('Not a regular file: {0}'.format(path))
     return file_stat
@@ -45,8 +55,8 @@ def format_prefix(prefix):
 class StaticFile(object):
 
     def __init__(self, path, headers, last_modified,
-                 gzip_path=None,
-                 gzip_headers=None):
+            gzip_path=None,
+            gzip_headers=None):
         self.path = path
         self.headers = headers
         self.last_modified = last_modified
@@ -59,13 +69,19 @@ class WhiteNoise(object):
     BLOCK_SIZE = 16 * 4096
     GZIP_SUFFIX = '.gz'
     ACCEPT_GZIP_RE = re.compile(r'\bgzip\b')
+    EXTRA_MIMETYPES = (
+            ('application/font-woff', '.woff'),
+            ('font/woff2', '.woff2'),)
+    # All mimetypes starting 'text/' take a charset parameter, plus the
+    # additions in this set
+    MIMETYPES_WITH_CHARSET = frozenset((
+        'application/javascript', 'application/xml'))
     # Ten years is what nginx sets a max age if you use 'expires max;'
     # so we'll follow its lead
     FOREVER = 10*365*24*60*60
 
     # Attributes that can be set by keyword args in the constructor
-    config_attrs = ('autorefresh', 'max_age', 'allow_all_origins', 'charset',
-                    'mimetypes')
+    config_attrs = ('autorefresh', 'max_age', 'allow_all_origins', 'charset')
     # Re-check the filesystem on every request so that any changes are
     # automatically picked up. NOTE: For use in development only, not supported
     # in production
@@ -78,8 +94,6 @@ class WhiteNoise(object):
     # served from a CDN, rather than your primary domain.
     allow_all_origins = True
     charset = 'utf-8'
-    # Custom mime types
-    mimetypes = None
 
     def __init__(self, application, root=None, prefix=None, **kwargs):
         for attr in self.config_attrs:
@@ -90,7 +104,7 @@ class WhiteNoise(object):
         if kwargs:
             raise TypeError("Unexpected keyword argument '{0}'".format(
                 list(kwargs.keys())[0]))
-        self.media_types = MediaTypes(extra_types=self.mimetypes)
+        self.mimetypes = configure_mimetypes(self.EXTRA_MIMETYPES)
         self.application = application
         self.files = {}
         self.directories = []
@@ -151,15 +165,13 @@ class WhiteNoise(object):
 
     def add_files(self, root, prefix=None):
         prefix = format_prefix(prefix)
-        if self.autorefresh:
-            # Later calls to `add_files` overwrite earlier ones, hence we need
-            # to store the list of directories in reverse order so later ones
-            # match first when they're checked in "autorefresh" mode
-            self.directories.insert(0, (root, prefix))
-        else:
-            self.update_files_dictionary(root, prefix)
-
-    def update_files_dictionary(self, root, prefix):
+        # Later calls to `add_files` overwrite earlier ones, hence we need to
+        # store the list of directories in reverse order so later ones match first
+        # when they're checked in "autorefresh" mode
+        self.directories.insert(0, (root, prefix))
+        # We still scan the directory in "autorefresh" mode even though this is wasted
+        # work because we want to ensure that any exceptions that will occur in
+        # production mode still get triggered
         for directory, _, filenames in os.walk(root, followlinks=True):
             for filename in filenames:
                 path = os.path.join(directory, filename)
@@ -200,14 +212,17 @@ class WhiteNoise(object):
         headers['Content-Length'] = str(file_stat.st_size)
 
     def add_mime_headers(self, headers, path, url):
-        media_type = self.media_types.get_type(path)
-        charset = self.get_charset(media_type, path, url)
+        mimetype, encoding = self.mimetypes.guess_type(path)
+        mimetype = mimetype or 'application/octet-stream'
+        charset = self.get_charset(mimetype, path, url)
         params = {'charset': charset} if charset else {}
-        headers.add_header('Content-Type', media_type, **params)
+        headers.add_header('Content-Type', mimetype, **params)
+        if encoding:
+            headers['Content-Encoding'] = encoding
 
-    def get_charset(self, media_type, path, url):
-        if (media_type.startswith('text/') or
-                media_type == 'application/javascript'):
+    def get_charset(self, mimetype, path, url):
+        if (mimetype.startswith('text/')
+                or mimetype in self.MIMETYPES_WITH_CHARSET):
             return self.charset
 
     def add_cache_headers(self, headers, path, url):
