@@ -1,47 +1,35 @@
-from __future__ import annotations
+from __future__ import print_function, division, unicode_literals
 
 import gzip
 import os
 import re
-from io import BytesIO
+try:
+    from io import BytesIO
+except ImportError:
+    from cStringIO import StringIO as BytesIO
 
 try:
     import brotli
-
     brotli_installed = True
 except ImportError:
     brotli_installed = False
 
 
-class Compressor:
+class Compressor(object):
 
     # Extensions that it's not worth trying to compress
     SKIP_COMPRESS_EXTENSIONS = (
         # Images
-        "jpg",
-        "jpeg",
-        "png",
-        "gif",
-        "webp",
+        'jpg', 'jpeg', 'png', 'gif', 'webp',
         # Compressed files
-        "zip",
-        "gz",
-        "tgz",
-        "bz2",
-        "tbz",
-        "xz",
-        "br",
+        'zip', 'gz', 'tgz', 'bz2', 'tbz',
         # Flash
-        "swf",
-        "flv",
+        'swf', 'flv',
         # Fonts
-        "woff",
-        "woff2",
-    )
+        'woff', 'woff2')
 
-    def __init__(
-        self, extensions=None, use_gzip=True, use_brotli=True, log=print, quiet=False
-    ):
+    def __init__(self, extensions=None, use_gzip=True, use_brotli=True,
+                 log=print, quiet=False):
         if extensions is None:
             extensions = self.SKIP_COMPRESS_EXTENSIONS
         self.extension_re = self.get_extension_re(extensions)
@@ -53,11 +41,11 @@ class Compressor:
     @staticmethod
     def get_extension_re(extensions):
         if not extensions:
-            return re.compile("^$")
+            return re.compile('^$')
         else:
             return re.compile(
-                r"\.({})$".format("|".join(map(re.escape, extensions))), re.IGNORECASE
-            )
+                r'\.({0})$'.format('|'.join(map(re.escape, extensions))),
+                re.IGNORECASE)
 
     def should_compress(self, filename):
         return not self.extension_re.search(filename)
@@ -66,30 +54,26 @@ class Compressor:
         pass
 
     def compress(self, path):
-        with open(path, "rb") as f:
-            stat_result = os.fstat(f.fileno())
+        with open(path, 'rb') as f:
             data = f.read()
         size = len(data)
         if self.use_brotli:
             compressed = self.compress_brotli(data)
-            if self.is_compressed_effectively("Brotli", path, size, compressed):
-                yield self.write_data(path, compressed, ".br", stat_result)
-            else:
-                # If Brotli compression wasn't effective gzip won't be either
+            success = self.write_data(compressed, size, path, '.br', 'Brotli')
+            # If Brotli compression wasn't effective gzip won't be either
+            if not success:
                 return
         if self.use_gzip:
             compressed = self.compress_gzip(data)
-            if self.is_compressed_effectively("Gzip", path, size, compressed):
-                yield self.write_data(path, compressed, ".gz", stat_result)
+            self.write_data(compressed, size, path, '.gz', 'Gzip')
 
     @staticmethod
     def compress_gzip(data):
         output = BytesIO()
         # Explicitly set mtime to 0 so gzip content is fully determined
         # by file content (0 = "no timestamp" according to gzip spec)
-        with gzip.GzipFile(
-            filename="", mode="wb", fileobj=output, compresslevel=9, mtime=0
-        ) as gz_file:
+        with gzip.GzipFile(filename='', mode='wb', fileobj=output,
+                           compresslevel=9, mtime=0) as gz_file:
             gz_file.write(data)
         return output.getvalue()
 
@@ -97,72 +81,56 @@ class Compressor:
     def compress_brotli(data):
         return brotli.compress(data)
 
-    def is_compressed_effectively(self, encoding_name, path, orig_size, data):
+    def write_data(self, data, orig_size, path, suffix, compression):
         compressed_size = len(data)
-        if orig_size == 0:
-            is_effective = False
+        if not self.compressed_effectively(orig_size, compressed_size):
+            self.log('Skipping {0} ({1} compression not effective)'.format(
+                     path, compression))
+            return False
         else:
-            ratio = compressed_size / orig_size
-            is_effective = ratio <= 0.95
-        if is_effective:
-            self.log(
-                "{} compressed {} ({}K -> {}K)".format(
-                    encoding_name, path, orig_size // 1024, compressed_size // 1024
-                )
-            )
-        else:
-            self.log(f"Skipping {path} ({encoding_name} compression not effective)")
-        return is_effective
+            self.log('{0} compressed {1} ({2}K -> {3}K)'.format(
+                    compression, path, orig_size // 1024,
+                    compressed_size // 1024))
+            with open(path + suffix, 'wb') as f:
+                f.write(data)
+            return True
 
-    def write_data(self, path, data, suffix, stat_result):
-        filename = path + suffix
-        with open(filename, "wb") as f:
-            f.write(data)
-        os.utime(filename, (stat_result.st_atime, stat_result.st_mtime))
-        return filename
+    @staticmethod
+    def compressed_effectively(orig_size, compressed_size):
+        if orig_size == 0:
+            return False
+        ratio = compressed_size / orig_size
+        return ratio <= 0.95
 
 
 def main(root, **kwargs):
     compressor = Compressor(**kwargs)
-    for dirpath, _dirs, files in os.walk(root):
+    for dirpath, dirs, files in os.walk(root):
         for filename in files:
             if compressor.should_compress(filename):
                 path = os.path.join(dirpath, filename)
-                for _compressed in compressor.compress(path):
-                    pass
+                compressor.compress(path)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     import argparse
-
     parser = argparse.ArgumentParser(
-        description="Search for all files inside <root> *not* matching "
-        "<extensions> and produce compressed versions with "
-        "'.gz' and '.br' suffixes (as long as this results in a "
-        "smaller file)"
-    )
-    parser.add_argument(
-        "-q", "--quiet", help="Don't produce log output", action="store_true"
-    )
-    parser.add_argument(
-        "--no-gzip",
-        help="Don't produce gzip '.gz' files",
-        action="store_false",
-        dest="use_gzip",
-    )
-    parser.add_argument(
-        "--no-brotli",
-        help="Don't produce brotli '.br' files",
-        action="store_false",
-        dest="use_brotli",
-    )
-    parser.add_argument("root", help="Path root from which to search for files")
-    parser.add_argument(
-        "extensions",
-        nargs="*",
-        help="File extensions to exclude from compression "
-        "(default: {})".format(", ".join(Compressor.SKIP_COMPRESS_EXTENSIONS)),
-        default=Compressor.SKIP_COMPRESS_EXTENSIONS,
-    )
+            description="Search for all files inside <root> *not* matching "
+                        "<extensions> and produce compressed versions with "
+                        "'.gz' and '.br' suffixes (as long as this results in a "
+                        "smaller file)")
+    parser.add_argument('-q', '--quiet', help="Don't produce log output",
+                        action='store_true')
+    parser.add_argument('--no-gzip', help="Don't produce gzip '.gz' files",
+                        action='store_false', dest='use_gzip')
+    parser.add_argument('--no-brotli', help="Don't produce brotli '.br' files",
+                        action='store_false', dest='use_brotli')
+    parser.add_argument('root', help='Path root from which to search for files')
+    parser.add_argument('extensions',
+                        nargs='*',
+                        help='File extensions to exclude from compression '
+                             '(default: {})'.format(', '.join(
+                                 Compressor.SKIP_COMPRESS_EXTENSIONS)),
+                        default=Compressor.SKIP_COMPRESS_EXTENSIONS)
     args = parser.parse_args()
     main(**vars(args))
