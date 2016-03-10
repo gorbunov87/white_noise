@@ -3,9 +3,57 @@ Change Log
 
 development
 -----------
-* Drop support for unsupported versions of Django (1.4-1.7) and Python (2.6).
-* Add Django middleware support for simpler integration.
 
+.. note:: The latest version of WhiteNoise contains some small **breaking changes**.
+   Most users will be able to upgrade without any problems, but some
+   less-used APIs have been modified:
+
+    * The setting ``WHITENOISE_GZIP_EXCLUDE_EXTENSIONS`` has been renamed to
+      ``WHITENOISE_SKIP_COMPRESS_EXTENSIONS``.
+    * The CLI :ref:`compression utility <cli-utility>` has moved from ``python -m whitenoise.gzip``
+      to ``python -m whitenoise.compress``.
+    * WhiteNoise no longer uses the system mimetypes files, so if you are serving
+      particularly obscure filetypes you may need to add their mimetypes explicitly
+      using the new :any:`mimetypes <WHITENOISE_MIMETYPES>` setting.
+    * Older versions of Django (1.4-1.7) and Python (2.6) are no longer supported.
+      If you need support for these platforms you can continue to use `WhiteNoise
+      2.x`_.
+
+.. _WhiteNoise 2.x: http://whitenoise.evans.io/en/legacy-2.x/
+
+
+Django middleware integration
++++++++++++++++++++++++++++++
+
+WhiteNoise can now integrate with Django by adding a single line to
+``MIDDLEWARE_CLASSES``  without any need to edit ``wsgi.py``. This also means
+that WhiteNoise plays nicely with other middleware classes such as
+`SecurityMiddleware`_. See the :ref:`updated documentation <django-middleware>`
+for details.
+
+.. _SecurityMiddleware: https://docs.djangoproject.com/en/stable/ref/middleware/#module-django.middleware.security
+
+
+Brotli compression support
+++++++++++++++++++++++++++
+
+Brotli is the modern, more efficient alternative to gzip for HTTP compression. To benefit
+from smaller files and faster page loads, just add the ``brotlipy`` library to your
+``requirements.txt`` and WhiteNoise will take care of the rest.
+
+Brotli is supported by Firefox and will shortly be available in Chrome.
+
+Simpler customisation
++++++++++++++++++++++
+
+...
+
+Use WhiteNoise in development with Django
++++++++++++++++++++++++++++++++++++++++++
+
+...
+
+---------------------------
 
 v2.0.6
 ------
