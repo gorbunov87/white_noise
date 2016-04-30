@@ -4,9 +4,18 @@ Very partial backport of the `http.HTTPStatus` enum from Python 3.5
 This implements just enough of the interface for our purposes, it does not
 attempt to be a full implementation.
 """
+# Python 3.0 - 3.4
+try:
+    from http import client as status_module
+    from http.server import BaseHTTPRequestHandler
+    responses = BaseHTTPRequestHandler.responses
+# Python 2.7
+except ImportError:
+    import httplib as status_module
+    responses = status_module.responses
 
 
-class HTTPStatus(int):
+class HTTPStatusValue(int):
 
     phrase = None
 
@@ -16,9 +25,16 @@ class HTTPStatus(int):
         return instance
 
 
-HTTPStatus.OK = HTTPStatus(200, "OK")
-HTTPStatus.PARTIAL_CONTENT = HTTPStatus(206, "Partial Content")
-HTTPStatus.FOUND = HTTPStatus(302, "Found")
-HTTPStatus.NOT_MODIFIED = HTTPStatus(304, "Not Modified")
-HTTPStatus.METHOD_NOT_ALLOWED = HTTPStatus(405, "Method Not Allowed")
-HTTPStatus.REQUESTED_RANGE_NOT_SATISFIABLE = HTTPStatus(416, "Range Not Satisfiable")
+class HTTPStatusProxy(object):
+
+    def __getattr__(self, status):
+        code = getattr(status_module, status)
+        phrase = responses[code]
+        if isinstance(phrase, tuple):
+            phrase = phrase[0]
+        value = HTTPStatusValue(code, phrase)
+        setattr(self, status, value)
+        return value
+
+
+HTTPStatus = HTTPStatusProxy()
