@@ -6,9 +6,8 @@ from wsgiref.util import FileWrapper
 
 from .media_types import MediaTypes
 from .static_file import StaticFile
-from .utils import (decode_if_byte_string, decode_path_info,
-                    ensure_leading_trailing_slash, MissingFileError,
-                    stat_regular_file)
+from .utils import (decode_path_info, ensure_leading_trailing_slash,
+                    MissingFileError, stat_regular_file)
 
 
 class WhiteNoise(object):
@@ -40,12 +39,9 @@ class WhiteNoise(object):
     def __init__(self, application, root=None, prefix=None, **kwargs):
         for attr in self.config_attrs:
             try:
-                value = kwargs.pop(attr)
+                setattr(self, attr, kwargs.pop(attr))
             except KeyError:
                 pass
-            else:
-                value = decode_if_byte_string(value)
-                setattr(self, attr, value)
         if kwargs:
             raise TypeError("Unexpected keyword argument '{0}'".format(
                 list(kwargs.keys())[0]))
@@ -78,8 +74,6 @@ class WhiteNoise(object):
             return []
 
     def add_files(self, root, prefix=None):
-        root = decode_if_byte_string(root)
-        prefix = decode_if_byte_string(prefix)
         prefix = ensure_leading_trailing_slash(prefix)
         if self.autorefresh:
             # Later calls to `add_files` overwrite earlier ones, hence we need
