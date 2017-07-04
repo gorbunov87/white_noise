@@ -1,17 +1,21 @@
-from __future__ import annotations
+from __future__ import unicode_literals
 
-from django.core.management import BaseCommand, get_commands, load_command_class
+import django
+from django.core.management import get_commands, load_command_class
+from django.test import SimpleTestCase
+
+django.setup()
 
 
-def get_command_instance(name: str) -> BaseCommand:
+def get_command_instance(name):
     app_name = get_commands()[name]
-    # django-stubs incorrect type for get_commands() fixed in:
-    # https://github.com/typeddjango/django-stubs/pull/1074
-    return load_command_class(app_name, name)  # type: ignore [arg-type]
+    return load_command_class(app_name, name)
 
 
-def test_command_output():
-    command = get_command_instance("runserver")
-    parser = command.create_parser("manage.py", "runserver")
-    assert "Wrapped by 'whitenoise.runserver_nostatic'" in parser.format_help()
-    assert not parser.get_default("use_static_handler")
+class RunserverNostaticTest(SimpleTestCase):
+
+    def test_command_output(self):
+        command = get_command_instance('runserver')
+        parser = command.create_parser('manage.py', 'runserver')
+        self.assertIn("Wrapped by 'whitenoise.runserver_nostatic'", parser.format_help())
+        self.assertFalse(parser.get_default('use_static_handler'))
