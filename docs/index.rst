@@ -3,11 +3,7 @@ WhiteNoise
 
 .. image:: https://img.shields.io/travis/evansd/whitenoise.svg
    :target:  https://travis-ci.org/evansd/whitenoise
-   :alt: Build Status (Linux)
-
-.. image:: https://img.shields.io/appveyor/ci/evansd/whitenoise.svg
-   :target:  https://ci.appveyor.com/project/evansd/whitenoise
-   :alt: Build Status (Windows)
+   :alt: Build Status
 
 .. image:: https://img.shields.io/pypi/v/whitenoise.svg
     :target: https://pypi.python.org/pypi/whitenoise
@@ -41,14 +37,6 @@ Worried that serving static files with Python is horribly inefficient?
 Still think you should be using Amazon S3? Have a look at the `Infrequently
 Asked Questions`_ below.
 
-Installation
-------------
-
-Install with:
-
-.. code-block:: sh
-
-    pip install whitenoise
 
 QuickStart for Django apps
 --------------------------
@@ -59,7 +47,7 @@ list, above all other middleware apart from Django's `SecurityMiddleware
 
 .. code-block:: python
 
-   MIDDLEWARE = [
+   MIDDLEWARE_CLASSES = [
      # 'django.middleware.security.SecurityMiddleware',
      'whitenoise.middleware.WhiteNoiseMiddleware',
      # ...
@@ -110,10 +98,9 @@ the standard WSGI protocol it is easy to integrate with WhiteNoise (see the
 Compatibility
 -------------
 
-WhiteNoise works with any WSGI-compatible application and is tested on Python
-**2.7**, **3.3** – **3.6** and **PyPy**, on both Linux and Windows.
+WhiteNoise works with any WSGI-compatible application and is tested on Python **2.7**, **3.3**, **3.4**, **3.5** and **PyPy**.
 
-Django WhiteNoiseMiddlware is tested with Django versions **1.8** --- **1.11**
+DjangoWhiteNoise is tested with Django versions **1.8** --- **1.10**
 
 
 Endorsements
