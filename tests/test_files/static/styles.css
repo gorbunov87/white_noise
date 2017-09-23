@@ -6,7 +6,6 @@ body {
 .thing {
   border: 1px solid black;
   color: blue;
-  background-image: url('directory/pixel.gif');
 }
 
 .thing2 {

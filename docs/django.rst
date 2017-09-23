@@ -29,7 +29,7 @@ this is done automatically for you.)
 In Django 1.9 and older, make sure you're using the static_ template tag to
 refer to your static files. For example:
 
-.. code-block:: django
+.. code-block:: html
 
    {% load static from staticfiles %}
    <img src="{% static "images/hi.jpg" %}" alt="Hi!" />
@@ -44,15 +44,14 @@ In Django 1.10 and later, you can use ``{% load static %}`` instead.
 2. Enable WhiteNoise
 --------------------
 
-Edit your ``settings.py`` file and add WhiteNoise to the ``MIDDLEWARE`` list. 
-The WhiteNoise middleware should be placed directly after the Django `SecurityMiddleware
-<https://docs.djangoproject.com/en/stable/ref/middleware/#module-django.middleware.security>`_ 
-and before all other middleware:
+Edit your ``settings.py`` file and add WhiteNoise to the ``MIDDLEWARE_CLASSES``
+list, above all other middleware apart from Django's `SecurityMiddleware
+<https://docs.djangoproject.com/en/stable/ref/middleware/#module-django.middleware.security>`_:
 
 .. code-block:: python
 
-   MIDDLEWARE = [
-     'django.middleware.security.SecurityMiddleware',
+   MIDDLEWARE_CLASSES = [
+     # 'django.middleware.security.SecurityMiddleware',
      'whitenoise.middleware.WhiteNoiseMiddleware',
      # ...
    ]
@@ -90,7 +89,7 @@ loading speed. To enable brotli compression you will need the `brotlipy`_
 Python package installed, usually by running ``pip install brotlipy`` and
 updating your ``requirements.txt`` file.
 
-Brotli is supported by Firefox, Chrome and no doubt
+Brotli is supported by Firefox and will shortly be available in Chrome, and no doubt
 other browsers too. WhiteNoise will only serve brotli data to browsers which request
 it so there are no compatibility issues with enabling brotli support.
 
@@ -170,46 +169,23 @@ You can disable Django's static file handling and allow WhiteNoise to take over
 simply by passing the ``--nostatic`` option to the ``runserver`` command, but
 you need to remember to add this option every time you call ``runserver``. An
 easier way is to edit your ``settings.py`` file and add
-``whitenoise.runserver_nostatic`` to the top of your ``INSTALLED_APPS`` list:
+``whitenoise.runserver_nostatic`` immediately above
+``django.contrib.staticfiles`` like so:
 
 .. code-block:: python
 
    INSTALLED_APPS = [
+       # ...
        'whitenoise.runserver_nostatic',
        'django.contrib.staticfiles',
        # ...
    ]
 
-.. note::
-
-    In older versions of WhiteNoise (below v4.0) it was not possible to use
-    ``runserver_nostatic`` with  `Channels`_ as Channels provides its own
-    implementation of runserver. Newer versions of WhiteNoise do not have this
-    problem and will work with Channels or any other third-party app that
-    provides its own implementation of runserver.
-
-.. _Channels: https://channels.readthedocs.io/
-
-
-.. _index-files-django:
-
-6. Index Files
---------------
-
-When the :any:`WHITENOISE_INDEX_FILE` option is enabled:
-
-* Visiting ``/example/`` will serve the file at ``/example/index.html``
-* Visiting ``/example`` will redirect (302) to ``/example/``
-* Visitng ``/example/index.html`` will redirect (302) to ``/example/``
-
-If you want to something other than ``index.html`` as the index file, then you
-can also set this option to an alternative filename.
-
 
 Available Settings
 ------------------
 
-The WhiteNoiseMiddlware class takes all the same configuration options as the
+The DjangoWhiteNoise class takes all the same configuration options as the
 WhiteNoise base class, but rather than accepting keyword arguments to its
 constructor it uses Django settings. The setting names are just the keyword
 arguments uppercased with a 'WHITENOISE\_' prefix.
@@ -241,13 +217,10 @@ arguments uppercased with a 'WHITENOISE\_' prefix.
 
     :default: ``settings.DEBUG``
 
-    Instead of only picking up files collected into ``STATIC_ROOT``, find and
-    serve files in their original directories using Django's "finders" API.
-    This is useful in development where it matches the behaviour of the old
-    ``runserver`` command. It's also possible to use this setting in
-    production, avoiding the need to run the ``collectstatic`` command during
-    the build, so long as you do not wish to use any of the caching and
-    compression features provided by the storage backends.
+    Instead of only picking up files collected into ``STATIC_ROOT``, find and serve
+    files in their original directories using Django's "finders" API. This is the
+    same behaviour as ``runserver`` provides by default, and is only useful if you
+    don't want to use the default ``runserver`` configuration in development.
 
 .. attribute:: WHITENOISE_MAX_AGE
 
@@ -262,15 +235,6 @@ arguments uppercased with a 'WHITENOISE\_' prefix.
     The default is chosen to be short enough not to cause problems with stale versions but
     long enough that, if you're running WhiteNoise behind a CDN, the CDN will still take
     the majority of the strain during times of heavy load.
-
-
-.. attribute:: WHITENOISE_INDEX_FILE
-
-    :default: ``False``
-
-    If ``True`` enable :ref:`index file serving <index-files-django>`. If set to a non-empty
-    string, enable index files and use that string as the index file name.
-
 
 .. attribute:: WHITENOISE_MIMETYPES
 
@@ -332,7 +296,6 @@ arguments uppercased with a 'WHITENOISE\_' prefix.
     confident won't benefit from compression, it speeds up the process if we
     just skip over them.
 
-
 .. attribute:: WHITENOISE_ADD_HEADERS_FUNCTION
 
     :default: ``None``
@@ -365,76 +328,18 @@ arguments uppercased with a 'WHITENOISE\_' prefix.
 
 .. __: https://docs.python.org/3/library/wsgiref.html#module-wsgiref.headers
 
-
-.. attribute:: WHITENOISE_IMMUTABLE_FILE_TEST
-
-    :default: See :file:`immutable_file_test <whitenoise/middleware.py#L108>` in source
-
-    Reference to a function which is passed the path and URL for each static
-    file and should return whether that file is immutable, i.e. guaranteed not
-    to change, and so can be safely cached forever. The default is designed to
-    work with Django's ManifestStaticFilesStorage backend, and any
-    derivatives of that, so you should only need to change this if you are
-    using a different system for versioning your static files.
-
-    Example: ::
-
-        def immutable_file_test(path, url):
-            # Match filename with 12 hex digits before the extension
-            # e.g. app.db8f2edc0c8a.js
-            return re.match(r'^.+\.[0-9a-f]{12}\..+$', url)
-
-        WHITENOISE_IMMUTABLE_FILE_TEST = immutable_file_test
-
-    The function is passed:
-
-    path
-      The absolute path to the local file
-
-    url
-      The host-relative URL of the file e.g. ``/static/styles/app.css``
-
-
 .. attribute:: WHITENOISE_STATIC_PREFIX
 
-    :default: Path component of ``settings.STATIC_URL`` (with
-              ``settings.FORCE_SCRIPT_NAME`` removed if set)
+    :default: Path component of ``settings.STATIC_URL``
 
     The URL prefix under which static files will be served.
 
     Usually this can be determined automatically by using the path component of
     ``STATIC_URL``. So if ``STATIC_URL`` is ``https://example.com/static/``
-    then ``WHITENOISE_STATIC_PREFIX`` will be ``/static/``.
-
-    If your application is not running at the root of the domain and
-    ``FORCE_SCRIPT_NAME`` is set then this value will be removed from the
-    ``STATIC_URL`` path first to give the correct prefix.
-
-    If your deployment is more complicated than this (for instance, if you are
-    using a CDN which is doing path rewriting) then you may need to configure
-    this value directly.
-
-
-.. attribute:: WHITENOISE_KEEP_ONLY_HASHED_FILES
-
-    :default: ``False``
-
-    Stores only files with hashed names in ``STATIC_ROOT``.
-
-    By default, Django's hashed static files system creates two copies of each
-    file in ``STATIC_ROOT``: one using the original name, e.g. ``app.js``, and
-    one using the hashed name, e.g. ``app.db8f2edc0c8a.js``. If WhiteNoise's
-    compression backend is being used this will create another two copies of
-    each of these files (using Gzip and Brotli compression) resulting in six
-    output files for each input file.
-
-    In some deployment scenarios it can be important to reduce the size of the
-    build artifact as much as possible.  This setting removes the "un-hashed"
-    version of the file (which should be not be referenced in any case) which
-    should reduce the space required for static files by half.
-
-    Note, this setting is only effective if the WhiteNoise storage backend is
-    being used.
+    then ``WHITENOISE_STATIC_PREFIX`` will be ``/static/``. However there are
+    cases where it's useful to set these independently, for instance if the
+    application is not running at the root of the domain or if your CDN is
+    doing path rewriting.
 
 
 Additional Notes
@@ -539,90 +444,3 @@ Using other storage backends
 WhiteNoise will only work with storage backends that stores their files on the
 local filesystem in ``STATIC_ROOT``. It will not work with backends that store
 files remotely, for instance on Amazon S3.
-
-
-WhiteNoise makes my tests run slow!
-+++++++++++++++++++++++++++++++++++
-
-WhiteNoise is designed to do as much work as possible upfront when the
-application starts so that it can serve files as efficiently as possible while
-the application is running. This makes sense for long-running production
-processes, but you might find that the added startup time is a problem during
-test runs when application instances are frequently being created and
-destroyed.
-
-The simplest way to fix this is to make sure that during testing the
-``WHITENOISE_AUTOREFRESH`` setting is set to ``True``. (By default it is
-``True`` when ``DEBUG`` is enabled and ``False`` otherwise.) This stops
-WhiteNoise from scanning your static files on start up but other than that its
-behaviour should be exactly the same.
-
-It is also worth making sure you don't have unnecessary files in your
-``STATIC_ROOT`` directory.  In particular, be careful not to include a
-``node_modules`` directory which can contain a very large number of files and
-significantly slow down your application startup. If you need to include
-specific files from ``node_modules`` then you can create symlinks from within
-your static directory to just the files you need.
-
-
-Using WhiteNoise with Webpack / Browserify / $LATEST_JS_THING
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-A simple technique for integrating any frontend build system with Django is to
-use a directory layout like this:
-
-.. code-block:: sh
-
-   ./static_src
-           ↓
-     $ ./node_modules/.bin/webpack
-           ↓
-   ./static_build
-           ↓
-     $ ./manage.py collectstatic
-           ↓
-   ./static_root
-
-Here ``static_src`` contains all the source files (JS, CSS, etc) for your
-project. Your build tool (which can be Webpack, Browserify or whatever you
-choose) then processes these files and writes the output into ``static_build``.
-
-The path to the ``static_build`` directory is added to ``settings.py``:
-
-.. code-block:: python
-
-   STATICFILES_DIRS = [
-       os.path.join(BASE_DIR, 'static_build')
-   ]
-
-This means that Django can find the processed files, but doesn't need to know anything
-about the tool which produced them.
-
-The final ``manage.py collectstatic`` step writes "hash-versioned" and
-compressed copies of the static files into ``static_root`` ready for
-production.
-
-Note, both the ``static_build`` and ``static_root`` directories should be
-excluded from version control (e.g. through ``.git-ignore``) and only the
-``static_src`` directory should be checked in.
-
-
-Deploying an application which is not at the root of the domain
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-Sometimes Django apps are deployed at a particular prefix (or "subdirectory")
-on a domain e.g. http://example.com/my-app/ rather than just http://example.com.
-
-In this case you would normally use Django's `FORCE_SCRIPT_NAME
-<https://docs.djangoproject.com/en/1.11/ref/settings/#force-script-name>`_
-setting to tell the application where it is located. You would also need to
-ensure that ``STATIC_URL`` uses the correct prefix as well. For example:
-
-.. code-block:: python
-
-   FORCE_SCRIPT_NAME = '/my-app'
-   STATIC_URL = FORCE_SCRIPT_NAME + '/static/'
-
-If you have set these two values then WhiteNoise will automatically configure
-itself correctly. If you are doing something more complex you may need to set
-:any:`WHITENOISE_STATIC_PREFIX` explicitly yourself.
