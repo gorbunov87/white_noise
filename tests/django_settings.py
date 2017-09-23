@@ -1,33 +1,14 @@
-import django
-
-from .utils import TestServer
-
-
-ALLOWED_HOSTS = ['*']
+SECRET_KEY = '4'
+STATIC_URL = '/static/'
 
 ROOT_URLCONF = 'tests.django_urls'
 
-SECRET_KEY = 'test_secret'
+INSTALLED_APPS = (
+    'django.contrib.staticfiles',
+    'whitenoise',
+)
 
-INSTALLED_APPS = [
-    'whitenoise.runserver_nostatic',
-    'django.contrib.staticfiles'
-]
-
-FORCE_SCRIPT_NAME = '/' + TestServer.PREFIX
-STATIC_URL = FORCE_SCRIPT_NAME + '/static/'
-
-# This path is not actually used, but we have to set it to something
-# or Django will complain
-STATIC_ROOT = '/dev/null'
-
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
-
-if django.VERSION >= (1, 10):
-    MIDDLEWARE = ['whitenoise.middleware.WhiteNoiseMiddleware']
-else:
-    MIDDLEWARE_CLASSES = ['whitenoise.middleware.WhiteNoiseMiddleware']
-
+ALLOWED_HOSTS = ['*']
 
 LOGGING = {
     'version': 1,
