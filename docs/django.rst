@@ -7,7 +7,7 @@ Using WhiteNoise with Django
 This guide walks you through setting up a Django project with WhiteNoise.
 In most cases it shouldn't take more than a couple of lines of configuration.
 
-I mention Heroku in a few place as that was the initial use case which prompted me
+I mention Heroku in a few places as that was the initial use case which prompted me
 to create WhiteNoise, but there's nothing Heroku-specific about WhiteNoise and the
 instructions below should apply whatever your hosting platform.
 
@@ -317,7 +317,7 @@ arguments upper-cased with a 'WHITENOISE\_' prefix.
 
 .. attribute:: WHITENOISE_CHARSET
 
-    :default: ``'utf-8'``
+    :default: ``settings.FILE_CHARSET`` (utf-8)
 
     Charset to add as part of the ``Content-Type`` header for all files whose
     mimetype allows a charset.
