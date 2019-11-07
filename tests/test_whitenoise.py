@@ -2,7 +2,10 @@ import os
 import re
 import tempfile
 
-from urllib.parse import urljoin
+try:
+    from urllib.parse import urljoin
+except ImportError:
+    from urlparse import urljoin
 import shutil
 import stat
 import sys
