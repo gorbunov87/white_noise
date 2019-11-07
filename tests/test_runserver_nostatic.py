@@ -1,3 +1,5 @@
+from __future__ import unicode_literals
+
 import django
 from django.core.management import get_commands, load_command_class
 import pytest
