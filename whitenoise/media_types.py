@@ -66,7 +66,6 @@ def default_types():
         ".m3u8": "application/vnd.apple.mpegurl",
         ".m4a": "audio/x-m4a",
         ".m4v": "video/x-m4v",
-        ".md": "text/markdown",
         ".mid": "audio/midi",
         ".midi": "audio/midi",
         ".mjs": "text/javascript",
