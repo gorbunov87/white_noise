@@ -2,5 +2,4 @@ Brotli
 coverage
 django
 pytest
-pytest-randomly
 requests
