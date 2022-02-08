@@ -37,7 +37,7 @@ class CompressedStaticFilesMixin:
             for path in paths:
                 yield path, None, False
 
-    def create_compressor(self, **kwargs) -> Compressor:
+    def create_compressor(self, **kwargs):
         return Compressor(**kwargs)
 
     def post_process_with_compression(self, files):
@@ -92,7 +92,7 @@ class HelpfulExceptionMixin:
                 processed = self.make_helpful_exception(processed, name)
             yield name, hashed_name, processed
 
-    def make_helpful_exception(self, exception: Exception, name: str) -> Exception:
+    def make_helpful_exception(self, exception, name):
         if isinstance(exception, ValueError):
             message = exception.args[0] if len(exception.args) else ""
             # Stringly typed exceptions. Yay!
@@ -122,12 +122,13 @@ class CompressedManifestStaticFilesStorage(
     those without the hash in their name)
     """
 
+    _new_files = None
+
     def __init__(self, *args, **kwargs):
         manifest_strict = getattr(settings, "WHITENOISE_MANIFEST_STRICT", None)
         if manifest_strict is not None:
             self.manifest_strict = manifest_strict
         super().__init__(*args, **kwargs)
-        self._new_files: set[str] | None = None
 
     def post_process(self, *args, **kwargs):
         files = super().post_process(*args, **kwargs)
@@ -142,7 +143,7 @@ class CompressedManifestStaticFilesStorage(
         # file is yielded we have to hook in to the `hashed_name` method to
         # keep track of them all.
         hashed_names = {}
-        new_files: set[str] = set()
+        new_files = set()
         self.start_tracking_new_files(new_files)
         for name, hashed_name, processed in files:
             if hashed_name and not isinstance(processed, Exception):
@@ -167,17 +168,17 @@ class CompressedManifestStaticFilesStorage(
             self._new_files.add(self.clean_name(name))
         return name
 
-    def start_tracking_new_files(self, new_files: set[str]) -> None:
+    def start_tracking_new_files(self, new_files):
         self._new_files = new_files
 
-    def stop_tracking_new_files(self) -> None:
+    def stop_tracking_new_files(self):
         self._new_files = None
 
     @property
-    def keep_only_hashed_files(self) -> bool:
+    def keep_only_hashed_files(self):
         return getattr(settings, "WHITENOISE_KEEP_ONLY_HASHED_FILES", False)
 
-    def delete_files(self, files_to_delete) -> None:
+    def delete_files(self, files_to_delete):
         for name in files_to_delete:
             try:
                 os.unlink(self.path(name))
@@ -185,7 +186,7 @@ class CompressedManifestStaticFilesStorage(
                 if e.errno != errno.ENOENT:
                     raise
 
-    def create_compressor(self, **kwargs) -> Compressor:
+    def create_compressor(self, **kwargs):
         return Compressor(**kwargs)
 
     def compress_files(self, names):
