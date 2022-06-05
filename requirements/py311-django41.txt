@@ -6,17 +6,17 @@
 #
 asgiref==3.5.2
     # via django
-attrs==22.1.0
+attrs==21.4.0
     # via pytest
 brotli==1.0.9
     # via -r requirements.in
-certifi==2022.6.15
+certifi==2022.5.18.1
     # via requests
-charset-normalizer==2.1.1
+charset-normalizer==2.0.12
     # via requests
-coverage==6.4.4
+coverage==6.4.1
     # via -r requirements.in
-django==4.1
+django==4.1a1
     # via -r requirements.in
 idna==3.3
     # via requests
@@ -36,11 +36,11 @@ pytest==7.1.2
     #   pytest-randomly
 pytest-randomly==3.12.0
     # via -r requirements.in
-requests==2.28.1
+requests==2.27.1
     # via -r requirements.in
 sqlparse==0.4.2
     # via django
 tomli==2.0.1
     # via pytest
-urllib3==1.26.12
+urllib3==1.26.9
     # via requests
