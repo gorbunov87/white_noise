@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import threading
 import warnings
+from typing import Any
 from wsgiref.simple_server import WSGIRequestHandler, make_server
 from wsgiref.util import shift_path_info
 
@@ -41,10 +42,12 @@ class AppServer:
         else:
             return self.application(environ, start_response)
 
-    def get(self, *args, **kwargs):
+    def get(self, *args: Any, **kwargs: Any) -> requests.Response:
         return self.request("get", *args, **kwargs)
 
-    def request(self, method, path, *args, **kwargs):
+    def request(
+        self, method: str, path: str, *args: Any, **kwargs: Any
+    ) -> requests.Response:
         url = "http://{0[0]}:{0[1]}{1}".format(self.server.server_address, path)
         thread = threading.Thread(target=self.server.handle_request)
         thread.start()
@@ -52,7 +55,7 @@ class AppServer:
         thread.join()
         return response
 
-    def close(self):
+    def close(self) -> None:
         self.server.server_close()
 
 
