@@ -15,6 +15,10 @@ except ImportError:  # pragma: no cover
     brotli_installed = False
 
 
+def noop_log(message: str) -> None:
+    pass
+
+
 class Compressor:
 
     # Extensions that it's not worth trying to compress
@@ -56,6 +60,8 @@ class Compressor:
         self.use_brotli = use_brotli and brotli_installed
         if not quiet:
             self.log = log
+        else:
+            self.log = noop_log
 
     @staticmethod
     def get_extension_re(extensions: Sequence[str]) -> Pattern[str]:
@@ -68,9 +74,6 @@ class Compressor:
 
     def should_compress(self, filename: str) -> bool:
         return not self.extension_re.search(filename)
-
-    def log(self, message: str) -> None:
-        pass
 
     def compress(self, path: str) -> Generator[str, None, None]:
         with open(path, "rb") as f:

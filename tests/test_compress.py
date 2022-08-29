@@ -70,8 +70,12 @@ def test_with_falsey_extensions():
 
 
 def test_custom_log():
-    compressor = Compressor(log="test")
-    assert compressor.log == "test"
+    def logit(message: str) -> None:
+        pass
+
+    compressor = Compressor(log=logit)
+
+    assert compressor.log is logit
 
 
 def test_compress():
