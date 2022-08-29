@@ -92,7 +92,7 @@ class HelpfulExceptionMixin:
                 processed = self.make_helpful_exception(processed, name)
             yield name, hashed_name, processed
 
-    def make_helpful_exception(self, exception, name):
+    def make_helpful_exception(self, exception: Exception, name: str) -> Exception:
         if isinstance(exception, ValueError):
             message = exception.args[0] if len(exception.args) else ""
             # Stringly typed exceptions. Yay!

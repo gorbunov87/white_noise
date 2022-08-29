@@ -54,10 +54,10 @@ class SlicedFile(BufferedIOBase):
         self.fileobj = fileobj
         self.remaining = end - start + 1
 
-    def read(self, size: int = -1) -> bytes:
+    def read(self, size: int | None = -1) -> bytes:
         if self.remaining <= 0:
             return b""
-        if size < 0:
+        if size is None or size < 0:
             size = self.remaining
         else:
             size = min(size, self.remaining)
@@ -235,12 +235,12 @@ class StaticFile:
 
 
 class Redirect:
-    def __init__(self, location, headers=None):
+    def __init__(self, location: str, headers: dict[str, str] | None = None) -> None:
         headers = list(headers.items()) if headers else []
         headers.append(("Location", quote(location.encode("utf8"))))
         self.response = Response(HTTPStatus.FOUND, headers, None)
 
-    def get_response(self, method, request_headers):
+    def get_response(self, method: str, request_headers: dict[str, str]) -> Response:
         return self.response
 
 

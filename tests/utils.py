@@ -60,7 +60,7 @@ class AppServer:
 
 
 class Files:
-    def __init__(self, directory, **files):
+    def __init__(self, directory: str, **files: str) -> None:
         self.directory = os.path.join(TEST_FILE_PATH, directory)
         for name, path in files.items():
             url = f"/{AppServer.PREFIX}/{path}"

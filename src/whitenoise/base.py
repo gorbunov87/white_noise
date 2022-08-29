@@ -4,7 +4,7 @@ import os
 import re
 import warnings
 from posixpath import normpath
-from typing import Callable, Iterator
+from typing import Callable, Generator
 from wsgiref.headers import Headers
 from wsgiref.util import FileWrapper
 
@@ -136,7 +136,7 @@ class WhiteNoise:
         static_file = self.get_static_file(path, url, stat_cache=stat_cache)
         self.files[url] = static_file
 
-    def find_file(self, url: str):  # -> | None
+    def find_file(self, url: str) -> Redirect | StaticFile | None:
         # Optimization: bail early if the URL can never match a file
         if not self.index_file and url.endswith("/"):
             return
@@ -148,14 +148,14 @@ class WhiteNoise:
             except MissingFileError:
                 pass
 
-    def candidate_paths_for_url(self, url):
+    def candidate_paths_for_url(self, url: str) -> Generator[str, None, None]:
         for root, prefix in self.directories:
             if url.startswith(prefix):
                 path = os.path.join(root, url[len(prefix) :])
                 if os.path.commonprefix((root, path)) == root:
                     yield path
 
-    def find_file_at_path(self, path, url):
+    def find_file_at_path(self, path: str, url: str) -> Redirect | StaticFile:
         if self.is_compressed_variant(path):
             raise MissingFileError(path)
         if self.index_file:
@@ -163,7 +163,9 @@ class WhiteNoise:
         else:
             return self.get_static_file(path, url)
 
-    def find_file_at_path_with_indexes(self, path, url):
+    def find_file_at_path_with_indexes(
+        self, path: str, url: str
+    ) -> Redirect | StaticFile:
         if url.endswith("/"):
             path = os.path.join(path, self.index_file)
             return self.get_static_file(path, url)
@@ -269,7 +271,7 @@ class WhiteNoise:
         return Redirect(relative_url, headers=headers)
 
 
-def scantree(root: str) -> Iterator[tuple[str, os.stat_result]]:
+def scantree(root: str) -> Generator[tuple[str, os.stat_result], None, None]:
     """
     Recurse the given directory yielding (pathname, os.stat(pathname)) pairs
     """
