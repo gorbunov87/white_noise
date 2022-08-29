@@ -5,6 +5,7 @@ import gzip
 import os
 import re
 from io import BytesIO
+from typing import Callable, Generator, Pattern, Sequence
 
 try:
     import brotli
@@ -41,8 +42,13 @@ class Compressor:
     )
 
     def __init__(
-        self, extensions=None, use_gzip=True, use_brotli=True, log=print, quiet=False
-    ):
+        self,
+        extensions: Sequence[str] | None = None,
+        use_gzip: bool = True,
+        use_brotli: bool = True,
+        log: Callable[[str], None] = print,
+        quiet: bool = False,
+    ) -> None:
         if extensions is None:
             extensions = self.SKIP_COMPRESS_EXTENSIONS
         self.extension_re = self.get_extension_re(extensions)
@@ -52,7 +58,7 @@ class Compressor:
             self.log = log
 
     @staticmethod
-    def get_extension_re(extensions):
+    def get_extension_re(extensions: Sequence[str]) -> Pattern[str]:
         if not extensions:
             return re.compile("^$")
         else:
@@ -60,13 +66,13 @@ class Compressor:
                 r"\.({})$".format("|".join(map(re.escape, extensions))), re.IGNORECASE
             )
 
-    def should_compress(self, filename):
+    def should_compress(self, filename: str) -> bool:
         return not self.extension_re.search(filename)
 
-    def log(self, message):
+    def log(self, message: str) -> None:
         pass
 
-    def compress(self, path):
+    def compress(self, path: str) -> Generator[str, None, None]:
         with open(path, "rb") as f:
             stat_result = os.fstat(f.fileno())
             data = f.read()
@@ -84,7 +90,7 @@ class Compressor:
                 yield self.write_data(path, compressed, ".gz", stat_result)
 
     @staticmethod
-    def compress_gzip(data):
+    def compress_gzip(data: bytes) -> bytes:
         output = BytesIO()
         # Explicitly set mtime to 0 so gzip content is fully determined
         # by file content (0 = "no timestamp" according to gzip spec)
@@ -95,10 +101,13 @@ class Compressor:
         return output.getvalue()
 
     @staticmethod
-    def compress_brotli(data):
-        return brotli.compress(data)
+    def compress_brotli(data: bytes) -> bytes:
+        result: bytes = brotli.compress(data)
+        return result
 
-    def is_compressed_effectively(self, encoding_name, path, orig_size, data):
+    def is_compressed_effectively(
+        self, encoding_name: str, path: str, orig_size: int, data: bytes
+    ) -> bool:
         compressed_size = len(data)
         if orig_size == 0:
             is_effective = False
@@ -115,7 +124,9 @@ class Compressor:
             self.log(f"Skipping {path} ({encoding_name} compression not effective)")
         return is_effective
 
-    def write_data(self, path, data, suffix, stat_result):
+    def write_data(
+        self, path: str, data: bytes, suffix: str, stat_result: os.stat_result
+    ) -> str:
         filename = path + suffix
         with open(filename, "wb") as f:
             f.write(data)
@@ -123,7 +134,7 @@ class Compressor:
         return filename
 
 
-def main(argv=None):
+def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Search for all files inside <root> *not* matching "
         "<extensions> and produce compressed versions with "
