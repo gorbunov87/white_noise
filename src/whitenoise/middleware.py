@@ -170,7 +170,7 @@ class WhiteNoiseMiddleware(WhiteNoise):
         for path in paths:
             yield path
 
-    def immutable_file_test(self, path, url):
+    def immutable_file_test(self, path, url) -> bool:
         """
         Determine whether given URL represents an immutable file (i.e. a
         file with a hash of its contents as part of its name) which can
