@@ -9,6 +9,8 @@ def decode_if_byte_string(value: Any, force_text: bool = False) -> str:
         result = value.decode()
     elif force_text and not isinstance(value, str):
         result = str(value)
+    else:
+        result = value
     return result
 
 
