@@ -4,7 +4,7 @@ import os
 import re
 import warnings
 from posixpath import normpath
-from typing import Callable
+from typing import Callable, Iterator
 from wsgiref.headers import Headers
 from wsgiref.util import FileWrapper
 
@@ -26,8 +26,8 @@ class WhiteNoise:
     def __init__(
         self,
         application,
-        root=None,
-        prefix=None,
+        root: str | None = None,
+        prefix: str | None = None,
         *,
         # Re-check the filesystem on every request so that any changes are
         # automatically picked up. NOTE: For use in development only, not supported
@@ -92,7 +92,7 @@ class WhiteNoise:
         else:
             return []
 
-    def add_files(self, root, prefix=None):
+    def add_files(self, root: str, prefix: str | None = None) -> None:
         root = decode_if_byte_string(root, force_text=True)
         root = os.path.abspath(root)
         root = root.rstrip(os.path.sep) + os.path.sep
@@ -109,7 +109,7 @@ class WhiteNoise:
             else:
                 warnings.warn(f"No directory at: {root}")
 
-    def update_files_dictionary(self, root, prefix):
+    def update_files_dictionary(self, root: str, prefix: str) -> None:
         # Build a mapping from paths to the results of `os.stat` calls
         # so we only have to touch the filesystem once
         stat_cache = dict(scantree(root))
@@ -119,7 +119,12 @@ class WhiteNoise:
             url = prefix + relative_url
             self.add_file_to_dictionary(url, path, stat_cache=stat_cache)
 
-    def add_file_to_dictionary(self, url, path, stat_cache=None):
+    def add_file_to_dictionary(
+        self,
+        url: str,
+        path: str,
+        stat_cache: dict[str, os.stat_result] | None = None,
+    ) -> None:
         if self.is_compressed_variant(path, stat_cache=stat_cache):
             return
         if self.index_file and url.endswith("/" + self.index_file):
@@ -131,7 +136,7 @@ class WhiteNoise:
         static_file = self.get_static_file(path, url, stat_cache=stat_cache)
         self.files[url] = static_file
 
-    def find_file(self, url):
+    def find_file(self, url: str):  # -> | None
         # Optimization: bail early if the URL can never match a file
         if not self.index_file and url.endswith("/"):
             return
@@ -187,7 +192,9 @@ class WhiteNoise:
         return normalised == url
 
     @staticmethod
-    def is_compressed_variant(path, stat_cache=None):
+    def is_compressed_variant(
+        path, stat_cache: dict[str, os.stat_result] | None = None
+    ) -> bool:
         if path[-3:] in (".gz", ".br"):
             uncompressed_path = path[:-3]
             if stat_cache is None:
@@ -196,7 +203,12 @@ class WhiteNoise:
                 return uncompressed_path in stat_cache
         return False
 
-    def get_static_file(self, path, url, stat_cache=None):
+    def get_static_file(
+        self,
+        path: str,
+        url: str,
+        stat_cache: dict[str, os.stat_result] | None = None,
+    ) -> StaticFile:
         # Optimization: bail early if file does not exist
         if stat_cache is None and not os.path.exists(path):
             raise MissingFileError(path)
@@ -214,7 +226,7 @@ class WhiteNoise:
             encodings={"gzip": path + ".gz", "br": path + ".br"},
         )
 
-    def add_mime_headers(self, headers, path, url):
+    def add_mime_headers(self, headers: Headers, path: str, url: str) -> None:
         media_type = self.media_types.get_type(path)
         if media_type.startswith("text/"):
             params = {"charset": str(self.charset)}
@@ -222,7 +234,7 @@ class WhiteNoise:
             params = {}
         headers.add_header("Content-Type", str(media_type), **params)
 
-    def add_cache_headers(self, headers, path, url):
+    def add_cache_headers(self, headers: Headers, path: str, url: str) -> None:
         if self.immutable_file_test(path, url):
             headers["Cache-Control"] = "max-age={}, public, immutable".format(
                 self.FOREVER
@@ -230,14 +242,14 @@ class WhiteNoise:
         elif self.max_age is not None:
             headers["Cache-Control"] = f"max-age={self.max_age}, public"
 
-    def immutable_file_test(self, path, url):
+    def immutable_file_test(self, path: str, url: str) -> bool:
         """
         This should be implemented by sub-classes (see e.g. WhiteNoiseMiddleware)
         or by setting the `immutable_file_test` config option
         """
         return False
 
-    def redirect(self, from_url, to_url):
+    def redirect(self, from_url: str, to_url: str) -> Redirect:
         """
         Return a relative 302 redirect
 
@@ -257,7 +269,7 @@ class WhiteNoise:
         return Redirect(relative_url, headers=headers)
 
 
-def scantree(root):
+def scantree(root: str) -> Iterator[tuple[str, os.stat_result]]:
     """
     Recurse the given directory yielding (pathname, os.stat(pathname)) pairs
     """
