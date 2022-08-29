@@ -8,6 +8,7 @@ from email.utils import formatdate, parsedate
 from http import HTTPStatus
 from io import BufferedIOBase
 from time import mktime
+from typing import BinaryIO, Sequence
 from urllib.parse import quote
 from wsgiref.headers import Headers
 
@@ -15,7 +16,9 @@ from wsgiref.headers import Headers
 class Response:
     __slots__ = ("status", "headers", "file")
 
-    def __init__(self, status, headers, file):
+    def __init__(
+        self, status: int, headers: Sequence[tuple[str, str]], file: BinaryIO | None
+    ) -> None:
         self.status = status
         self.headers = headers
         self.file = file
@@ -46,12 +49,12 @@ class SlicedFile(BufferedIOBase):
     been reached.
     """
 
-    def __init__(self, fileobj, start, end):
+    def __init__(self, fileobj: BinaryIO, start: int, end: int) -> None:
         fileobj.seek(start)
         self.fileobj = fileobj
         self.remaining = end - start + 1
 
-    def read(self, size=-1):
+    def read(self, size: int = -1) -> bytes:
         if self.remaining <= 0:
             return b""
         if size < 0:
@@ -62,7 +65,7 @@ class SlicedFile(BufferedIOBase):
         self.remaining -= len(data)
         return data
 
-    def close(self):
+    def close(self) -> None:
         self.fileobj.close()
 
 

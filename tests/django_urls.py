@@ -1,3 +1,5 @@
 from __future__ import annotations
 
-urlpatterns = []
+from typing import Any
+
+urlpatterns: list[Any] = []

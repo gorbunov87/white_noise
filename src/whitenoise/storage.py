@@ -171,7 +171,7 @@ class CompressedManifestStaticFilesStorage(
     def start_tracking_new_files(self, new_files):
         self._new_files = new_files
 
-    def stop_tracking_new_files(self):
+    def stop_tracking_new_files(self) -> None:
         self._new_files = None
 
     @property
