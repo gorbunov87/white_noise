@@ -8,7 +8,7 @@ from email.utils import formatdate, parsedate
 from http import HTTPStatus
 from io import BufferedIOBase
 from time import mktime
-from typing import BinaryIO, Sequence
+from typing import BinaryIO, Callable, Pattern, Sequence
 from urllib.parse import quote
 from wsgiref.headers import Headers
 
@@ -70,15 +70,21 @@ class SlicedFile(BufferedIOBase):
 
 
 class StaticFile:
-    def __init__(self, path, headers, encodings=None, stat_cache=None):
+    def __init__(
+        self,
+        path: str,
+        headers: list[tuple[str, str]],
+        encodings: dict[str, str] | None = None,
+        stat_cache: dict[str, os.stat_result] | None = None,
+    ) -> None:
         files = self.get_file_stats(path, encodings, stat_cache)
-        headers = self.get_headers(headers, files)
-        self.last_modified = parsedate(headers["Last-Modified"])
-        self.etag = headers["ETag"]
-        self.not_modified_response = self.get_not_modified_response(headers)
-        self.alternatives = self.get_alternatives(headers, files)
+        parsed_headers = self.get_headers(headers, files)
+        self.last_modified = parsedate(parsed_headers["Last-Modified"])
+        self.etag = parsed_headers["ETag"]
+        self.not_modified_response = self.get_not_modified_response(parsed_headers)
+        self.alternatives = self.get_alternatives(parsed_headers, files)
 
-    def get_response(self, method, request_headers):
+    def get_response(self, method: str, request_headers: dict[str, str]) -> Response:
         if method not in ("GET", "HEAD"):
             return NOT_ALLOWED_RESPONSE
         if self.is_not_modified(request_headers):
@@ -99,7 +105,7 @@ class StaticFile:
                 pass
         return Response(HTTPStatus.OK, headers, file_handle)
 
-    def get_range_response(self, range_header, base_headers, file_handle):
+    def get_range_response(self, range_header, base_headers, file_handle) -> Response:
         headers = []
         for item in base_headers:
             if item[0] == "Content-Length":
@@ -115,7 +121,7 @@ class StaticFile:
         headers.append(("Content-Length", str(end - start + 1)))
         return Response(HTTPStatus.PARTIAL_CONTENT, headers, file_handle)
 
-    def get_byte_range(self, range_header, size):
+    def get_byte_range(self, range_header: str, size: int) -> tuple[int, int]:
         start, end = self.parse_byte_range(range_header)
         if start < 0:
             start = max(start + size, 0)
@@ -126,7 +132,7 @@ class StaticFile:
         return start, end
 
     @staticmethod
-    def parse_byte_range(range_header):
+    def parse_byte_range(range_header: str) -> tuple[int, int | None]:
         units, _, range_spec = range_header.strip().partition("=")
         if units != "bytes":
             raise ValueError()
@@ -144,7 +150,7 @@ class StaticFile:
         return start, end
 
     @staticmethod
-    def get_range_not_satisfiable_response(file_handle, size):
+    def get_range_not_satisfiable_response(file_handle, size: int) -> Response:
         if file_handle is not None:
             file_handle.close()
         return Response(
@@ -154,9 +160,13 @@ class StaticFile:
         )
 
     @staticmethod
-    def get_file_stats(path, encodings, stat_cache):
+    def get_file_stats(
+        path: str,
+        encodings: dict[str, str] | None,
+        stat_cache: dict[str, os.stat_result] | None,
+    ) -> dict[str | None, FileEntry]:
         # Primary file has an encoding of None
-        files = {None: FileEntry(path, stat_cache)}
+        files: dict[str | None, FileEntry] = {None: FileEntry(path, stat_cache)}
         if encodings:
             for encoding, alt_path in encodings.items():
                 try:
@@ -165,7 +175,9 @@ class StaticFile:
                     continue
         return files
 
-    def get_headers(self, headers_list, files):
+    def get_headers(
+        self, headers_list: list[tuple[str, str]], files: dict[str | None, FileEntry]
+    ) -> Headers:
         headers = Headers(headers_list)
         main_file = files[None]
         if len(files) > 1:
@@ -184,17 +196,21 @@ class StaticFile:
         return headers
 
     @staticmethod
-    def get_not_modified_response(headers):
-        not_modified_headers = []
+    def get_not_modified_response(headers: Headers) -> Response:
+        not_modified_headers: list[tuple[str, str]] = []
         for key in NOT_MODIFIED_HEADERS:
             if key in headers:
-                not_modified_headers.append((key, headers[key]))
+                value = headers[key]
+                assert value is not None
+                not_modified_headers.append((key, value))
         return Response(
             status=HTTPStatus.NOT_MODIFIED, headers=not_modified_headers, file=None
         )
 
     @staticmethod
-    def get_alternatives(base_headers, files):
+    def get_alternatives(
+        base_headers: Headers, files: dict[str | None, FileEntry]
+    ) -> list[tuple[Pattern[str], str, list[tuple[str, str]]]]:
         # Sort by size so that the smallest compressed alternative matches first
         alternatives = []
         files_by_size = sorted(files.items(), key=lambda i: i[1].size)
@@ -209,7 +225,7 @@ class StaticFile:
             alternatives.append((encoding_re, file_entry.path, headers.items()))
         return alternatives
 
-    def is_not_modified(self, request_headers):
+    def is_not_modified(self, request_headers: dict[str, str]) -> bool:
         previous_etag = request_headers.get("HTTP_IF_NONE_MATCH")
         if previous_etag is not None:
             return previous_etag == self.etag
@@ -224,7 +240,9 @@ class StaticFile:
             return parsedate(last_requested) >= self.last_modified
         return False
 
-    def get_path_and_headers(self, request_headers):
+    def get_path_and_headers(
+        self, request_headers: dict[str, str]
+    ) -> tuple[str, list[tuple[str, str]]]:
         accept_encoding = request_headers.get("HTTP_ACCEPT_ENCODING", "")
         if accept_encoding == "*":
             accept_encoding = ""
@@ -236,9 +254,12 @@ class StaticFile:
 
 class Redirect:
     def __init__(self, location: str, headers: dict[str, str] | None = None) -> None:
-        headers = list(headers.items()) if headers else []
-        headers.append(("Location", quote(location.encode("utf8"))))
-        self.response = Response(HTTPStatus.FOUND, headers, None)
+        if headers is None:
+            header_list = []
+        else:
+            header_list = list(headers.items())
+        header_list.append(("Location", quote(location.encode("utf8"))))
+        self.response = Response(HTTPStatus.FOUND, header_list, None)
 
     def get_response(self, method: str, request_headers: dict[str, str]) -> Response:
         return self.response
@@ -259,15 +280,21 @@ class IsDirectoryError(MissingFileError):
 class FileEntry:
     __slots__ = ("path", "size", "mtime")
 
-    def __init__(self, path, stat_cache=None):
+    def __init__(
+        self, path: str, stat_cache: dict[str, os.stat_result] | None = None
+    ) -> None:
         self.path = path
-        stat_function = os.stat if stat_cache is None else stat_cache.__getitem__
+        stat_function: Callable[[str], os.stat_result] = (
+            os.stat if stat_cache is None else stat_cache.__getitem__
+        )
         stat = self.stat_regular_file(path, stat_function)
         self.size = stat.st_size
         self.mtime = stat.st_mtime
 
     @staticmethod
-    def stat_regular_file(path, stat_function):
+    def stat_regular_file(
+        path: str, stat_function: Callable[[str], os.stat_result]
+    ) -> os.stat_result:
         """
         Wrap `stat_function` to raise appropriate errors if `path` is not a
         regular file
